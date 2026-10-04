@@ -1,0 +1,7 @@
+symbol,organism,role,description,ncbi_query
+Pi54,Oryza sativa,host-resistance,"Broad-spectrum blast resistance gene (NBS-LRR) on chromosome 11, cloned from the indica line Tetep.",Pi54[Title] AND Oryza[Organism]
+Pi9,Oryza sativa,host-resistance,"Broad-spectrum blast resistance gene in the Pi2/Pi9 cluster on chromosome 6.",Pi9[Title] AND Oryza[Organism]
+Pi2,Oryza sativa,host-resistance,"Broad-spectrum blast resistance gene in the Pi2/Pi9 cluster on chromosome 6.",Pi2[Title] AND Oryza[Organism] AND (blast OR resistance)
+Pita,Oryza sativa,host-resistance,"Blast resistance gene on chromosome 12; recognises the pathogen effector AVR-Pita.",Pita[Title] AND Oryza[Organism]
+Pib,Oryza sativa,host-resistance,"Blast resistance gene (NBS-LRR) on chromosome 2.",Pib[Title] AND Oryza[Organism]
+AVR-Pita,Pyricularia oryzae,pathogen-avirulence,"Effector of the blast fungus recognised by Pita; variation here lets strains overcome Pita.",AVR-Pita[Title] AND Pyricularia oryzae[Organism]

@@ -1,0 +1,49 @@
+# BlastWatch risk model, rule-based v1.
+#
+# Rice blast (Magnaporthe oryzae) infects when leaves stay wet for many hours at moderate
+# temperatures. Grid weather has no leaf-wetness sensor, so an hour counts as "conducive"
+# when relative humidity is very high inside a favourable temperature band.
+# The approach follows weather-driven models such as BLASTAM (Japan); every number below
+# is a starting assumption to be calibrated in the backtest (plan weeks 4-5).
+
+model_version = "rules-v1"
+
+# Each daily score covers the "infection night": 12:00 the previous day to 12:00 on the
+# scored date, so an overnight dew period is never split at midnight.
+window_start_hour = 12
+min_hours_per_window = 20
+
+[conducive_hour]
+min_rh_pct = 90.0
+min_temp_c = 20.0
+max_temp_c = 30.0
+
+[score]
+# Longest unbroken run of conducive hours (dominant factor).
+full_run_hours = 10
+run_weight = 60
+# Total conducive hours in the window.
+full_wet_hours = 16
+hours_weight = 20
+# Light/moderate rain favours spread; heavy rain washes spores off, so no bonus above max.
+rain_min_mm = 0.5
+rain_max_mm = 20.0
+rain_weight = 10
+# Overcast skies slow leaf drying.
+cloud_min_pct = 70.0
+cloud_weight = 10
+
+[levels]
+moderate = 35
+high = 65
+
+# Crop susceptibility multiplier by state and month (1.0 = most fields in the vulnerable
+# tillering-to-heading stage). Tamil Nadu grows rice in overlapping seasons (Kuruvai
+# Jun-Sep, Samba Aug-Jan, Thaladi Oct-Feb, Navarai Dec-Apr), so no month drops to zero.
+# Placeholder values: refine with TNAU crop calendars during calibration.
+[susceptibility.default]
+default = 1.0
+
+[susceptibility."Tamil Nadu"]
+default = 0.6
+months = { 7 = 0.8, 8 = 0.9, 9 = 1.0, 10 = 1.0, 11 = 1.0, 12 = 1.0, 1 = 0.8 }
