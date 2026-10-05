@@ -2,14 +2,19 @@
 import argparse
 import logging
 from datetime import date
+from pathlib import Path
 
+from . import alerts, calibration
 from .db import SessionLocal, init_db
 from .ingest import faostat, genbank, weather
 from .pipeline import compute_risk, load_seeds
+from .risk import load_rules
 
 
 def cmd_init(args):
-    init_db()
+    added = init_db()
+    if added:
+        print("added columns:", ", ".join(added))
     with SessionLocal() as s:
         print("seeded", load_seeds(s))
 
@@ -39,12 +44,50 @@ def cmd_risk(args):
         print("risk days computed:", compute_risk(s))
 
 
+def cmd_alerts(args):
+    with SessionLocal() as s:
+        print(alerts.evaluate(s, load_rules()))
+
+
+def cmd_refresh(args):
+    from .scheduler import refresh
+
+    print(refresh())
+
+
+def cmd_observations(args):
+    with SessionLocal() as s:
+        print("observations upserted:", calibration.import_observations(s, Path(args.file)))
+
+
+def _pct(v):
+    return "   -" if v is None else f"{v * 100:4.0f}%"
+
+
+def cmd_backtest(args):
+    with SessionLocal() as s:
+        r = calibration.backtest(s, load_rules(), args.start, args.end, args.lead)
+    print(f"observations: {r['observations']} ({r['present']} with blast, {r['absent']} without); "
+          f"skipped for missing weather: {r['skipped_no_weather']}")
+    if not r["observations"]:
+        print("No observations in range. Import some with `observations import FILE` first.")
+        return
+    if not r["absent"]:
+        print("WARNING: no absence records, so false alarms cannot be measured.")
+    print(f"warned = any day scored >= threshold within {args.lead} days before the observation\n")
+    print("threshold   TP  FP  FN  TN    POD   FAR  Spec.   CSI")
+    for x in r["results"]:
+        mark = "  <- current High" if x.threshold == r["current_high"] else ""
+        print(f"{x.threshold:9.0f} {x.tp:4} {x.fp:3} {x.fn:3} {x.tn:3}  {_pct(x.pod)} {_pct(x.far)} "
+              f"{_pct(x.specificity)} {_pct(x.csi)}{mark}")
+    print("\nPOD = outbreaks warned; FAR = warnings that were false alarms; CSI balances both.")
+
+
 def cmd_all(args):
     cmd_init(args)
     cmd_faostat(argparse.Namespace(region="Asia", refresh=False))
     cmd_genes(argparse.Namespace(retmax=20))
-    cmd_weather(argparse.Namespace(past_days=3, forecast_days=7))
-    cmd_risk(args)
+    cmd_refresh(args)
 
 
 def cmd_serve(args):
@@ -88,12 +131,27 @@ def main(argv=None):
     g.set_defaults(func=cmd_genes)
 
     sub.add_parser("risk", help="recompute daily blast risk").set_defaults(func=cmd_risk)
-    sub.add_parser("all", help="init + faostat + genes + weather + risk").set_defaults(func=cmd_all)
+    sub.add_parser("alerts", help="raise farmer alerts for sustained high risk").set_defaults(func=cmd_alerts)
+    sub.add_parser("refresh", help="weather (with fallback) + risk + alerts").set_defaults(func=cmd_refresh)
+    sub.add_parser("all", help="init + faostat + genes + refresh").set_defaults(func=cmd_all)
+
+    o = sub.add_parser("observations", help="field observations for calibration")
+    o_sub = o.add_subparsers(dest="action", required=True)
+    oi = o_sub.add_parser("import", help="import a CSV shaped like seed/observations_template.csv")
+    oi.add_argument("file")
+    oi.set_defaults(func=cmd_observations)
+
+    bt = sub.add_parser("backtest", help="score the model against imported observations")
+    bt.add_argument("--start", type=date.fromisoformat, required=True, help="YYYY-MM-DD")
+    bt.add_argument("--end", type=date.fromisoformat, required=True, help="YYYY-MM-DD")
+    bt.add_argument("--lead", type=int, default=3, help="days of warning that count as a hit")
+    bt.set_defaults(func=cmd_backtest)
 
     sv = sub.add_parser("serve", help="run the API and dashboard")
     sv.add_argument("--host", default="127.0.0.1")
     sv.add_argument("--port", type=int, default=8000)
-    sv.add_argument("--with-scheduler", action="store_true", help="refresh weather+risk every 3 h")
+    sv.add_argument("--with-scheduler", action="store_true",
+                    help="bootstrap reference data, then refresh weather/risk/alerts every 3 h")
     sv.set_defaults(func=cmd_serve)
 
     sub.add_parser("schedule", help="run the refresh loop on its own").set_defaults(func=cmd_schedule)

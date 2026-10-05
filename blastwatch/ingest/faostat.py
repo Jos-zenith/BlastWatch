@@ -14,6 +14,7 @@ import httpx
 from .. import config
 from ..db import upsert
 from ..models import Production
+from ..runs import track
 
 BULK_URL = "https://bulks-faostat.fao.org/production/Production_Crops_Livestock_E_{region}.zip"
 RICE_ITEM_CODE = 27
@@ -74,7 +75,7 @@ def read_zip(path: Path, item_code: int = RICE_ITEM_CODE) -> list[dict]:
 
 
 def ingest(session, region: str = "Asia", refresh: bool = False) -> int:
-    rows = read_zip(download(region, refresh=refresh))
-    count = upsert(session, Production, rows, ["area_code", "item_code", "year", "source"])
-    session.commit()
-    return count
+    with track(session, "faostat") as run:
+        rows = read_zip(download(region, refresh=refresh))
+        run.rows = upsert(session, Production, rows, ["area_code", "item_code", "year", "source"])
+    return run.rows

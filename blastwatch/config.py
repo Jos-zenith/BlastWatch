@@ -33,3 +33,7 @@ NCBI_API_KEY = os.getenv("NCBI_API_KEY", "")
 # All weather timestamps are stored as naive local time in this zone.
 TIMEZONE = "Asia/Kolkata"
 HTTP_TIMEOUT = float(os.getenv("BLASTWATCH_HTTP_TIMEOUT", "60"))
+# Shared secret for POST /api/sensors/readings; the endpoint is disabled while unset.
+INGEST_KEY = os.getenv("BLASTWATCH_INGEST_KEY", "")
+# MET Norway's terms require an identifying User-Agent with contact details.
+USER_AGENT = os.getenv("BLASTWATCH_USER_AGENT", "blastwatch/0.2 (rice blast early warning; student project)")

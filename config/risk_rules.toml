@@ -1,12 +1,12 @@
-# BlastWatch risk model, rule-based v1.
+# BlastWatch risk model, rule-based v2.
 #
 # Rice blast (Magnaporthe oryzae) infects when leaves stay wet for many hours at moderate
-# temperatures. Grid weather has no leaf-wetness sensor, so an hour counts as "conducive"
-# when relative humidity is very high inside a favourable temperature band.
-# The approach follows weather-driven models such as BLASTAM (Japan); every number below
-# is a starting assumption to be calibrated in the backtest (plan weeks 4-5).
+# temperatures. An hour counts as "conducive" when the leaf is (estimated to be) wet and the
+# temperature is inside the favourable band. The approach follows weather-driven models such
+# as BLASTAM (Japan); every number below is a starting assumption to be calibrated with
+# `python -m blastwatch backtest` against field observations.
 
-model_version = "rules-v1"
+model_version = "rules-v2"
 
 # Each daily score covers the "infection night": 12:00 the previous day to 12:00 on the
 # scored date, so an overnight dew period is never split at midnight.
@@ -14,9 +14,19 @@ window_start_hour = 12
 min_hours_per_window = 20
 
 [conducive_hour]
-min_rh_pct = 90.0
 min_temp_c = 20.0
 max_temp_c = 30.0
+
+# Leaf wetness is not measured by grid weather, so each hour uses the best signal available,
+# in this order. Canopy RH in a flooded paddy usually exceeds screen-level (2 m) RH, which is
+# why a measured sensor value always wins when one exists.
+[wetness]
+priority = ["sensor", "lwp", "dpd", "rh"]
+sensor_min_wet_minutes = 30     # leaf-wetness sensor: wet if >= 30 min of the hour
+lwp_min_pct = 50.0              # Open-Meteo leaf_wetness_probability
+dpd_max_c = 2.0                 # dew-point depression (T - Td) at or below this = dew likely
+rain_wets_leaf_mm = 0.2         # any measurable rain in the hour wets the leaf (dpd method)
+rh_min_pct = 90.0               # last resort when no dew point is available
 
 [score]
 # Longest unbroken run of conducive hours (dominant factor).
@@ -36,6 +46,19 @@ cloud_weight = 10
 [levels]
 moderate = 35
 high = 65
+
+# Alerts go to farmers, so they need sustained, near-term, fresh evidence: at least
+# `min_high_days` High days within the next `horizon_days` (forecast skill drops after ~3 days).
+# A district gets at most one alert per episode; a new one needs `cooldown_days` of quiet.
+[alerts]
+horizon_days = 3
+min_high_days = 2
+cooldown_days = 5
+
+# Data older than this is "stale" (shown with a warning) or "expired" (alerts suppressed).
+[freshness]
+stale_after_hours = 6
+expire_after_hours = 24
 
 # Crop susceptibility multiplier by state and month (1.0 = most fields in the vulnerable
 # tillering-to-heading stage). Tamil Nadu grows rice in overlapping seasons (Kuruvai

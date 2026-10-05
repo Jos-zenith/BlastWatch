@@ -11,80 +11,51 @@
   <header>
     <div>
       <h1>BlastWatch</h1>
-      <p class="sub">Rice blast early warning · Tamil Nadu pilot</p>
+      <p class="sub" data-t="tagline"></p>
     </div>
-    <div id="freshness" class="muted"></div>
+    <nav class="top-nav">
+      <div class="lang" role="group" aria-label="Language">
+        <button data-lang="en">English</button>
+        <button data-lang="ta">தமிழ்</button>
+      </div>
+      <a href="research.html" data-t="research"></a>
+    </nav>
   </header>
 
+  <div id="freshness" class="banner" role="status"></div>
+
   <main>
-    <section class="card map-card">
-      <div class="card-head">
-        <h2>District risk</h2>
-        <div id="dates" class="date-strip" role="tablist" aria-label="Risk date"></div>
-      </div>
-      <div id="map"></div>
-      <div class="legend">
-        <span><i class="dot low"></i>Low</span>
-        <span><i class="dot moderate"></i>Moderate</span>
-        <span><i class="dot high"></i>High</span>
-        <span class="muted">Dashed outline = forecast</span>
-      </div>
-      <table class="ranking">
-        <thead><tr><th>District</th><th>Level</th><th class="num">Score</th><th class="num">Wet run (h)</th><th class="num">Rain (mm)</th></tr></thead>
-        <tbody id="ranking"></tbody>
-      </table>
+    <section class="card">
+      <div id="summary" class="summary"></div>
+      <ul id="actions" class="actions"></ul>
     </section>
 
     <section class="card detail-card">
-      <div class="card-head"><h2 id="detail-title">Select a district</h2></div>
-      <div id="detail-body" class="muted">Click a district on the map or in the table.</div>
+      <div id="map"></div>
       <div id="detail" hidden>
-        <h3>Daily risk (past week + forecast)</h3>
-        <div class="chart-box"><canvas id="risk-chart"></canvas></div>
-        <h3>Humidity &amp; temperature (hourly)</h3>
-        <div class="chart-box"><canvas id="weather-chart"></canvas></div>
-        <div id="advice" class="advice"></div>
-      </div>
-    </section>
-
-    <section class="card wide">
-      <div class="card-head">
-        <h2>Rice production context <span class="muted">· FAOSTAT</span></h2>
-        <div class="controls">
-          <select id="metric" aria-label="Metric">
-            <option value="production_t">Production (Mt)</option>
-            <option value="area_ha">Area harvested (Mha)</option>
-            <option value="yield_kg_ha">Yield (t/ha)</option>
-          </select>
-          <select id="from-year" aria-label="From year">
-            <option value="1961">Since 1961</option>
-            <option value="1990" selected>Since 1990</option>
-            <option value="2010">Since 2010</option>
-          </select>
+        <div class="card-head">
+          <h2 id="detail-title"></h2>
+          <span id="detail-action" class="badge"></span>
         </div>
-      </div>
-      <div id="areas" class="chips"></div>
-      <div class="chart-box tall"><canvas id="prod-chart"></canvas></div>
-      <p id="prod-note" class="muted small"></p>
-    </section>
+        <p id="detail-todo"></p>
+        <div id="detail-days" class="day-strip big"></div>
+        <p id="detail-basis" class="muted small"></p>
+        <div class="chart-box"><canvas id="wet-chart"></canvas></div>
 
-    <section class="card wide">
-      <div class="card-head"><h2>Resistance genes <span class="muted">· GenBank</span></h2></div>
-      <table class="genes">
-        <thead><tr><th>Gene</th><th>Organism</th><th>Role</th><th>Description</th><th>GenBank hits</th></tr></thead>
-        <tbody id="genes"></tbody>
-      </table>
-      <div id="gene-records"></div>
+        <h3 data-t="messages"></h3>
+        <div id="messages"></div>
+
+        <h3 data-t="seed_advice"></h3>
+        <ul id="varieties" class="small"></ul>
+      </div>
     </section>
   </main>
 
-  <footer class="muted small">
-    Weather: Open-Meteo · History: NASA POWER · Production: FAOSTAT · Genes: NCBI GenBank.
-    Risk model rules-v1 is uncalibrated decision support, not a diagnosis.
-  </footer>
+  <footer class="muted small" data-t="footer"></footer>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
-  <script src="app.js"></script>
+  <script src="i18n.js"></script>
+  <script src="officer.js"></script>
 </body>
 </html>

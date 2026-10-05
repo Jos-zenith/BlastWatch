@@ -50,29 +50,20 @@ main {
 .card-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
 
 #map { height: 420px; border-radius: 8px; border: 1px solid var(--border); }
-.date-strip { display: flex; gap: 4px; flex-wrap: wrap; }
-.date-strip button, .chips button {
+.chips button {
   border: 1px solid var(--border); background: transparent; color: var(--text);
   border-radius: 999px; padding: 3px 10px; font: inherit; font-size: 13px; cursor: pointer;
 }
-.date-strip button[aria-selected="true"], .chips button.on {
+.chips button.on {
   background: var(--accent); border-color: var(--accent); color: #fff;
 }
-.date-strip button.fc { border-style: dashed; }
 
-.legend { display: flex; gap: 14px; flex-wrap: wrap; margin: 8px 0; font-size: 13px; }
-.dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; vertical-align: -1px; }
-.dot.low, .lvl.Low { background: var(--low); }
-.dot.moderate, .lvl.Moderate { background: var(--moderate); }
-.dot.high, .lvl.High { background: var(--high); }
-.lvl { color: #fff; border-radius: 4px; padding: 1px 7px; font-size: 12px; font-weight: 600; }
 
 table { width: 100%; border-collapse: collapse; font-size: 14px; }
 th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
 th { color: var(--muted); font-weight: 600; font-size: 13px; }
 tbody tr { cursor: pointer; }
 tbody tr:hover, tbody tr.sel { background: color-mix(in srgb, var(--accent) 10%, transparent); }
-.ranking { margin-top: 8px; }
 td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 
 .chart-box { position: relative; height: 200px; }
@@ -97,10 +88,60 @@ footer { padding: 8px 24px 24px; }
   .genes td:nth-child(4), .genes th:nth-child(4) { display: none; }
 }
 @media (max-width: 600px) {
-  .ranking td:nth-child(4), .ranking th:nth-child(4),
-  .ranking td:nth-child(5), .ranking th:nth-child(5),
   .genes td:nth-child(2), .genes th:nth-child(2) { display: none; }
   #freshness { font-size: 13px; }
   .controls { width: 100%; }
   .controls select { flex: 1; min-width: 0; }
+}
+
+/* ---- Officer view ---- */
+.top-nav { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.lang { display: inline-flex; border: 1px solid var(--border); border-radius: 999px; overflow: hidden; }
+.lang button { border: 0; background: transparent; color: var(--text); font: inherit; font-size: 14px; padding: 4px 12px; cursor: pointer; }
+.lang button[aria-pressed="true"] { background: var(--accent); color: #fff; }
+
+.banner { margin: 0 24px; padding: 8px 12px; border-radius: 8px; font-size: 14px; border: 1px solid var(--border); }
+.banner.fresh { color: var(--muted); }
+.banner.stale { border-color: var(--moderate); background: color-mix(in srgb, var(--moderate) 12%, transparent); }
+.banner.expired { border-color: var(--high); background: color-mix(in srgb, var(--high) 12%, transparent); font-weight: 600; }
+
+.summary { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+.pill { border: 1px solid var(--c); border-radius: 999px; padding: 3px 12px; font-size: 14px; }
+.pill b { color: var(--c); }
+
+.actions { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.action-row {
+  width: 100%; text-align: left; font: inherit; color: var(--text); cursor: pointer;
+  background: transparent; border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px;
+  display: grid; gap: 6px;
+}
+.action-row:hover, .action-row.sel { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.row-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.name { font-weight: 600; }
+.badge { background: var(--c); color: #fff; border-radius: 4px; padding: 1px 8px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+
+.day-strip { display: flex; gap: 3px; flex-wrap: wrap; }
+.day {
+  background: var(--c); color: #fff; border-radius: 4px; padding: 1px 6px; font-size: 11px;
+  display: inline-flex; flex-direction: column; align-items: center; min-width: 44px;
+}
+.day b { font-weight: 600; }
+.day.outlook { background: transparent; color: var(--text); border: 1.5px dashed var(--c); }
+.day-strip.big .day { padding: 4px 6px; min-width: 64px; font-size: 12px; }
+.day i { font-style: normal; }
+.day small { opacity: .85; }
+.detail-card #map { height: 300px; margin-bottom: 12px; }
+
+.message { border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; }
+.message p { margin: 0 0 8px; }
+.msg-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.msg-actions button {
+  font: inherit; font-size: 13px; padding: 4px 10px; border-radius: 6px; cursor: pointer;
+  border: 1px solid var(--border); background: transparent; color: var(--text);
+}
+.msg-actions button[data-sent] { border-color: var(--accent); color: var(--accent); }
+
+@media (max-width: 600px) {
+  .banner { margin: 0 16px; }
+  .day { min-width: 38px; }
 }

@@ -5,7 +5,7 @@ PostgreSQL (postgresql+psycopg://...) for deployment — the upsert helper suppo
 """
 from pathlib import Path
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
@@ -32,10 +32,35 @@ engine = make_engine()
 SessionLocal = sessionmaker(bind=engine, expire_on_commit=False)
 
 
-def init_db(bind: Engine | None = None) -> None:
+def init_db(bind: Engine | None = None) -> list[str]:
+    """Create missing tables, then add any missing nullable columns to existing ones.
+
+    create_all never alters an existing table, so a database created by an older version
+    (e.g. the deployed PostgreSQL) would otherwise miss new columns. Only nullable columns
+    are added automatically; anything else needs a real migration tool.
+    """
     from . import models  # noqa: F401  (registers the tables on Base.metadata)
 
-    Base.metadata.create_all(bind or engine)
+    bind = bind or engine
+    Base.metadata.create_all(bind)
+    return add_missing_columns(bind)
+
+
+def add_missing_columns(bind: Engine) -> list[str]:
+    inspector = inspect(bind)
+    added = []
+    with bind.begin() as conn:
+        for table in Base.metadata.sorted_tables:
+            existing = {c["name"] for c in inspector.get_columns(table.name)}
+            for col in table.columns:
+                if col.name in existing:
+                    continue
+                if not col.nullable:
+                    raise RuntimeError(f"cannot auto-add NOT NULL column {table.name}.{col.name}")
+                col_type = col.type.compile(dialect=bind.dialect)
+                conn.execute(text(f'ALTER TABLE {table.name} ADD COLUMN {col.name} {col_type}'))
+                added.append(f"{table.name}.{col.name}")
+    return added
 
 
 def upsert(session: Session, model, rows: list[dict], keys: list[str]) -> int:

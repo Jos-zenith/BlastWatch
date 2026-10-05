@@ -1,6 +1,6 @@
 """Rule-based blast risk engine (pure functions, no database access)."""
 import tomllib
-from collections import defaultdict
+from collections import Counter, defaultdict
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -18,6 +18,9 @@ class HourObs:
     precip_mm: float | None = None
     cloud_pct: float | None = None
     is_forecast: bool = False
+    dew_point_c: float | None = None
+    leaf_wet_prob: float | None = None
+    leaf_wet_min: float | None = None
 
 
 @dataclass(frozen=True)
@@ -31,6 +34,7 @@ class DayRisk:
     mean_temp_c: float | None
     susceptibility: float
     is_forecast: bool
+    wetness_basis: str | None = None
 
 
 def load_rules(path: Path = config.RULES_PATH) -> dict:
@@ -44,11 +48,27 @@ def susceptibility_for(rules: dict, state: str, month: int) -> float:
     return float(entry.get("months", {}).get(str(month), entry.get("default", 1.0)))
 
 
+def leaf_wetness(obs: HourObs, rules: dict) -> tuple[bool, str | None]:
+    """Whether the leaf is wet this hour, using the best available signal, and which one."""
+    w = rules["wetness"]
+    for method in w["priority"]:
+        if method == "sensor" and obs.leaf_wet_min is not None:
+            return obs.leaf_wet_min >= w["sensor_min_wet_minutes"], "sensor"
+        if method == "lwp" and obs.leaf_wet_prob is not None:
+            return obs.leaf_wet_prob >= w["lwp_min_pct"], "lwp"
+        if method == "dpd" and obs.dew_point_c is not None and obs.temp_c is not None:
+            rained = (obs.precip_mm or 0.0) >= w["rain_wets_leaf_mm"]
+            return rained or obs.temp_c - obs.dew_point_c <= w["dpd_max_c"], "dpd"
+        if method == "rh" and obs.rh_pct is not None:
+            return obs.rh_pct >= w["rh_min_pct"], "rh"
+    return False, None
+
+
 def is_conducive(obs: HourObs, rules: dict) -> bool:
     c = rules["conducive_hour"]
-    if obs.temp_c is None or obs.rh_pct is None:
+    if obs.temp_c is None or not c["min_temp_c"] <= obs.temp_c <= c["max_temp_c"]:
         return False
-    return obs.rh_pct >= c["min_rh_pct"] and c["min_temp_c"] <= obs.temp_c <= c["max_temp_c"]
+    return leaf_wetness(obs, rules)[0]
 
 
 def window_date(ts: datetime, start_hour: int) -> date:
@@ -80,6 +100,7 @@ def score_window(hours: list[HourObs], rules: dict, susceptibility: float, day: 
             run = 0
         prev_ts = h.ts
 
+    bases = Counter(b for b in (leaf_wetness(h, rules)[1] for h in hours) if b)
     rain = sum(h.precip_mm or 0.0 for h in hours)
     temps = [h.temp_c for h in hours if h.temp_c is not None]
     clouds = [h.cloud_pct for h in hours if h.cloud_pct is not None]
@@ -103,6 +124,7 @@ def score_window(hours: list[HourObs], rules: dict, susceptibility: float, day: 
         mean_temp_c=round(sum(temps) / len(temps), 1) if temps else None,
         susceptibility=susceptibility,
         is_forecast=any(h.is_forecast for h in hours),
+        wetness_basis=bases.most_common(1)[0][0] if bases else None,
     )
 
 

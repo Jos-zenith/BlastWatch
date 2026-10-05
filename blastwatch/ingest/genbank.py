@@ -8,6 +8,7 @@ from sqlalchemy import delete
 from .. import config
 from ..db import upsert
 from ..models import Gene, GeneRecord
+from ..runs import track
 
 EUTILS = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
 
@@ -60,7 +61,7 @@ def fetch_gene(client: httpx.Client, gene: Gene, retmax: int = 20) -> tuple[int,
 
 def ingest(session, retmax: int = 20) -> int:
     count = 0
-    with httpx.Client(timeout=config.HTTP_TIMEOUT) as client:
+    with httpx.Client(timeout=config.HTTP_TIMEOUT) as client, track(session, "genbank") as run:
         for gene in session.query(Gene).order_by(Gene.id):
             hits, rows = fetch_gene(client, gene, retmax)
             gene.ncbi_hits = hits
@@ -69,4 +70,5 @@ def ingest(session, retmax: int = 20) -> int:
             session.execute(delete(GeneRecord).where(GeneRecord.gene_id == gene.id))
             count += upsert(session, GeneRecord, rows, ["gene_id", "accession"])
             session.commit()
+        run.rows = count
     return count

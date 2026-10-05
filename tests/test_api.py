@@ -1,49 +1,32 @@
 from datetime import date, datetime, timedelta
 
-import pytest
-from fastapi.testclient import TestClient
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy import select
 
-from blastwatch.api import create_app
-from blastwatch.db import init_db, make_engine, upsert
-from blastwatch.models import District, Production, WeatherHourly
-from blastwatch.pipeline import compute_risk, load_seeds
+from blastwatch import config
+from blastwatch.models import Alert, District, RiskDaily
 
 
-@pytest.fixture
-def client(tmp_path):
-    engine = make_engine(f"sqlite:///{(tmp_path / 'test.db').as_posix()}")
-    init_db(engine)
-    Session = sessionmaker(bind=engine, expire_on_commit=False)
-    with Session() as s:
-        load_seeds(s)
-        thanjavur = s.query(District).filter_by(name="Thanjavur").one()
-        madurai = s.query(District).filter_by(name="Madurai").one()
-        thanjavur.rice_area_ha = 100_000
-
-        # Three days of synthetic weather around today: Thanjavur wet nights, Madurai dry.
-        start = datetime.combine(date.today() - timedelta(days=1), datetime.min.time()).replace(hour=12)
-        rows = []
-        for i in range(72):
-            ts = start + timedelta(hours=i)
-            night = ts.hour >= 20 or ts.hour < 9
-            for d, rh in ((thanjavur, 97 if night else 70), (madurai, 55)):
-                rows.append({"district_id": d.id, "ts": ts, "temp_c": 25.0, "rh_pct": rh,
-                             "precip_mm": 0.2, "cloud_pct": 90, "source": "open-meteo",
-                             "is_forecast": ts > datetime.now(), "fetched_at": datetime.now()})
-        upsert(s, WeatherHourly, rows, ["district_id", "ts", "source"])
-        upsert(s, Production, [
-            {"area_code": 100, "area": "India", "item_code": 27, "item": "Rice", "year": 2024,
-             "area_ha": 5.05e7, "production_t": 2.18e8, "yield_kg_ha": 4313.2, "source": "faostat"},
-        ], ["area_code", "item_code", "year", "source"])
-        s.commit()
-        compute_risk(s)
-    yield TestClient(create_app(session_factory=Session))
+def ids(client):
+    return {d["name"]: d["id"] for d in client.get("/api/districts").json()}
 
 
-def test_health(client):
+def test_health_reports_forecast_freshness(client):
     body = client.get("/api/health").json()
     assert body["status"] == "ok" and body["districts"] == 17
+    assert body["forecast"]["status"] == "fresh"
+    assert "last_ok" in body["sources"]["open-meteo"]
+
+
+def test_outlook_puts_alert_districts_first(client):
+    body = client.get("/api/outlook").json()
+    first = body["districts"][0]
+    assert first["name"] == "Thanjavur" and first["action"] == "alert"
+    assert first["days"][0]["horizon"] == "near"
+    assert first["days"][0]["wetness_basis"] == "rh"  # synthetic data has no dew point / LWP
+    madurai = next(d for d in body["districts"] if d["name"] == "Madurai")
+    assert madurai["action"] == "none"
+    # Districts without any weather are "unknown", not silently "none".
+    assert next(d for d in body["districts"] if d["name"] == "Erode")["action"] == "unknown"
 
 
 def test_risk_map_ranks_wet_district_first(client):
@@ -56,15 +39,55 @@ def test_risk_map_ranks_wet_district_first(client):
 
 
 def test_district_endpoints(client):
-    districts = {d["name"]: d["id"] for d in client.get("/api/districts").json()}
-    tid = districts["Thanjavur"]
+    tid = ids(client)["Thanjavur"]
     assert client.get(f"/api/districts/{tid}/risk").json()["series"]
     assert client.get(f"/api/districts/{tid}/weather").json()["hours"]
     advice = client.get(f"/api/districts/{tid}/advice").json()
     assert advice["level"] == "High"
+    assert "Spray only if lesions are found" in advice["message"]
     assert "CO 51" in [v["name"] for v in advice["varieties"]]
     assert "Pusa Basmati 1637" not in [v["name"] for v in advice["varieties"]]
     assert client.get("/api/districts/9999/risk").status_code == 404
+
+
+def test_alerts_list_and_mark_sent(client, seeded):
+    with seeded() as s:
+        d = s.scalar(select(District).where(District.name == "Thanjavur"))
+        s.add(Alert(district_id=d.id, episode_start=date.today(), high_days=date.today().isoformat(),
+                    message_en="en", message_ta="ta", status="ready", created_at=datetime.now()))
+        s.commit()
+    [alert] = client.get("/api/alerts").json()
+    assert alert["district_ta"] == "தஞ்சாவூர்" and alert["status"] == "ready"
+    assert client.post(f"/api/alerts/{alert['id']}/sent").json()["status"] == "sent"
+    assert client.post("/api/alerts/999/sent").status_code == 404
+
+
+def test_sensor_ingest_requires_key(client, monkeypatch):
+    body = {"station_id": "TNJ-01", "district": "Madurai",
+            "readings": [{"ts": datetime.now().isoformat(), "temp_c": 25, "leaf_wet_min": 60}]}
+    monkeypatch.setattr(config, "INGEST_KEY", "")
+    assert client.post("/api/sensors/readings", json=body).status_code == 503
+    monkeypatch.setattr(config, "INGEST_KEY", "secret")
+    assert client.post("/api/sensors/readings", json=body, headers={"X-API-Key": "nope"}).status_code == 401
+    bad = {**body, "station_id": "has spaces"}
+    assert client.post("/api/sensors/readings", json=bad, headers={"X-API-Key": "secret"}).status_code == 422
+
+
+def test_sensor_readings_override_grid_weather(client, seeded, monkeypatch):
+    monkeypatch.setattr(config, "INGEST_KEY", "secret")
+    # Grid weather says Madurai is dry; a canopy sensor reports long leaf wetness overnight.
+    start = datetime.combine(date.today() - timedelta(days=1), datetime.min.time()).replace(hour=12)
+    readings = [{"ts": (start + timedelta(hours=i)).isoformat(), "temp_c": 25.0,
+                 "leaf_wet_min": 60 if 8 <= i < 21 else 0} for i in range(24)]
+    res = client.post("/api/sensors/readings", headers={"X-API-Key": "secret"},
+                      json={"station_id": "MDU-01", "district": "madurai", "readings": readings})
+    assert res.status_code == 202 and res.json()["accepted"] == 24
+    with seeded() as s:
+        d = s.scalar(select(District).where(District.name == "Madurai"))
+        today = s.scalar(select(RiskDaily).where(RiskDaily.district_id == d.id, RiskDaily.date == date.today(),
+                                                 RiskDaily.model_version == "rules-v2"))
+    assert today.wetness_basis == "sensor"
+    assert today.longest_wet_run == 13 and today.level == "High"
 
 
 def test_production_and_genes(client):
@@ -77,6 +100,6 @@ def test_production_and_genes(client):
     assert client.get("/api/genes/nope").status_code == 404
 
 
-def test_dashboard_is_served(client):
-    res = client.get("/")
-    assert res.status_code == 200 and "BlastWatch" in res.text
+def test_pages_are_served(client):
+    assert "officer.js" in client.get("/").text
+    assert "research.js" in client.get("/research.html").text

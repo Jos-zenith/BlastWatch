@@ -2,7 +2,8 @@ from datetime import date, datetime, timedelta
 
 import pytest
 
-from blastwatch.risk import HourObs, load_rules, score_series, score_window, susceptibility_for, window_date
+from blastwatch.risk import (HourObs, leaf_wetness, load_rules, score_series, score_window,
+                             susceptibility_for, window_date)
 
 RULES = load_rules()
 START = datetime(2025, 11, 9, 12)  # noon; the window ending noon 10 Nov scores as 2025-11-10
@@ -80,3 +81,25 @@ def test_state_month_lookup():
     assert susceptibility_for(RULES, "Tamil Nadu", 10) == 1.0
     assert susceptibility_for(RULES, "Tamil Nadu", 4) == RULES["susceptibility"]["Tamil Nadu"]["default"]
     assert susceptibility_for(RULES, "Unknown State", 4) == 1.0
+
+
+def hour(**kw):
+    return HourObs(START, kw.pop("temp_c", 25.0), kw.pop("rh_pct", None), **kw)
+
+
+def test_leaf_wetness_prefers_sensor_then_model_then_dew_point_then_rh():
+    # A sensor reading wins even when every other signal disagrees.
+    assert leaf_wetness(hour(rh_pct=99, leaf_wet_prob=95, leaf_wet_min=0), RULES) == (False, "sensor")
+    assert leaf_wetness(hour(rh_pct=60, leaf_wet_prob=70), RULES) == (True, "lwp")
+    assert leaf_wetness(hour(rh_pct=99, leaf_wet_prob=10), RULES) == (False, "lwp")
+    assert leaf_wetness(hour(rh_pct=80, dew_point_c=23.5), RULES) == (True, "dpd")  # 1.5 C depression
+    assert leaf_wetness(hour(rh_pct=80, dew_point_c=20.0), RULES) == (False, "dpd")
+    assert leaf_wetness(hour(rh_pct=80, dew_point_c=20.0, precip_mm=1.0), RULES) == (True, "dpd")  # rain
+    assert leaf_wetness(hour(rh_pct=95), RULES) == (True, "rh")
+    assert leaf_wetness(hour(), RULES) == (False, None)
+
+
+def test_day_reports_dominant_wetness_basis():
+    hours = [HourObs(START + timedelta(hours=i), 25.0, 96.0, leaf_wet_prob=80.0) for i in range(24)]
+    [day] = score_series(hours, RULES, "default")
+    assert day.wetness_basis == "lwp" and day.longest_wet_run == 24
