@@ -42,7 +42,8 @@ Copy `.env.example` to `.env`:
 
 - `NCBI_EMAIL`, `NCBI_API_KEY` identify you to NCBI. A free key raises the limit from 3 to 10 requests/s.
 - `BLASTWATCH_DATABASE_URL` defaults to SQLite at `data/blastwatch.db`. Set a
-  `postgresql+psycopg://…` URL for deployment (`pip install psycopg[binary]`). The upsert helper supports both.
+  PostgreSQL URL for deployment; both `postgresql://…` and `postgresql+psycopg://…` are supported.
+  The Psycopg 3 binary driver is installed from `requirements.txt`. The upsert helper supports SQLite and PostgreSQL.
 
 ## Risk model (rules-v1)
 

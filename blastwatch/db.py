@@ -18,6 +18,8 @@ class Base(DeclarativeBase):
 
 def make_engine(url: str | None = None) -> Engine:
     url = url or config.DATABASE_URL
+    if url.startswith("postgresql://"):
+        url = url.replace("postgresql://", "postgresql+psycopg://", 1)
     connect_args = {}
     if url.startswith("sqlite"):
         connect_args["check_same_thread"] = False
