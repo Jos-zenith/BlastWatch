@@ -103,6 +103,13 @@ models = ["ecmwf", "gefs", "icon"]
 refresh_hours = 6               # ensembles update every 6-12 h; ~220 Open-Meteo calls per refresh
 alert_p = 0.5                   # experimental rule: >= min_high_days near days with P(High) >= this
 
+# Forecast confidence shown next to each level (ensemble.forecast_confidence): the share of pooled
+# ensemble members that agree with the rule-based level. Stale data or a night beyond the alert
+# horizon is always "Low". This is confidence in the WEATHER forecast, not in a blast outcome.
+[confidence]
+high_agree = 0.7
+moderate_agree = 0.4
+
 # Data older than this is "stale" (shown with a warning) or "expired" (alerts suppressed).
 [freshness]
 stale_after_hours = 6

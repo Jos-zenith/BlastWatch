@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from . import config
 from .db import upsert
 from .models import District, Gene, RiskDaily, Variety, WeatherHourly
-from .risk import HourObs, load_rules, score_series
+from .risk import HourObs, has_wetness_signal, load_rules, score_series
 
 # When several sources cover the same hour: field sensors, then live forecasts, then history.
 SOURCE_PRIORITY = {"sensor": 0, "open-meteo": 1, "met-no": 2, "nasa-power": 3, "archive-forecast": 4}
@@ -50,16 +50,17 @@ def merged_hours(session: Session, district_id: int, source: str | None = None) 
     if source:
         query = query.where(or_(WeatherHourly.source == source, WeatherHourly.source.like(f"{source}:%")))
     rows = session.scalars(query.order_by(WeatherHourly.ts)).all()
-    best: dict[datetime, WeatherHourly] = {}
+    best: dict[datetime, tuple[bool, int, HourObs]] = {}
     for r in rows:
+        obs = HourObs(r.ts, r.temp_c, r.rh_pct, r.precip_mm, r.cloud_pct, r.is_forecast,
+                      r.dew_point_c, r.leaf_wet_prob, r.leaf_wet_min)
+        # A row without temperature or any wetness signal (e.g. a sensor reporting only
+        # temperature) must not hide a complete row from a lower-priority source.
+        key = (not (obs.temp_c is not None and has_wetness_signal(obs)), source_rank(r.source))
         current = best.get(r.ts)
-        if current is None or source_rank(r.source) < source_rank(current.source):
-            best[r.ts] = r
-    return [
-        HourObs(r.ts, r.temp_c, r.rh_pct, r.precip_mm, r.cloud_pct, r.is_forecast,
-                r.dew_point_c, r.leaf_wet_prob, r.leaf_wet_min)
-        for r in sorted(best.values(), key=lambda r: r.ts)
-    ]
+        if current is None or key < current[:2]:
+            best[r.ts] = (*key, obs)
+    return [best[ts][2] for ts in sorted(best)]
 
 
 def level_snapshot(session: Session, rules: dict, since: date, district_ids: list[int] | None = None) -> dict:

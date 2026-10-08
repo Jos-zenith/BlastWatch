@@ -205,3 +205,16 @@ def test_recent_events_endpoint(client):
     bus.publish("test.ping", n=1)
     events = client.get("/api/events?limit=5").json()
     assert events[-1]["kind"] == "test.ping" and len(events) <= 5
+
+
+def test_forecast_confidence_is_agreement_capped_by_age_and_lead():
+    rules = load_rules()
+    conf = ensemble.forecast_confidence
+    assert conf("High", 0.85, 0.1, 1, "fresh", rules) == {"level": "High", "reason": "agreement", "agree": 0.85}
+    assert conf("High", 0.5, 0.3, 1, "fresh", rules)["level"] == "Moderate"
+    assert conf("High", 0.1, 0.3, 1, "fresh", rules)["level"] == "Low"  # the centres disagree with the rule
+    assert conf("Low", 0.05, 0.1, 0, "fresh", rules)["agree"] == 0.85
+    # Agreement cannot outweigh old data or a night beyond the alert horizon.
+    assert conf("High", 0.95, 0.05, 1, "stale", rules) == {"level": "Low", "reason": "stale"}
+    assert conf("High", 0.95, 0.05, 5, "fresh", rules) == {"level": "Low", "reason": "lead"}
+    assert conf("High", None, None, 1, "fresh", rules) == {"level": None, "reason": "no_ensemble"}

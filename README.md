@@ -1,8 +1,31 @@
 # BlastWatch
 
-Rice blast early warning for field officers. It combines an **agricultural database**
+Weather-based rice blast risk warning for field officers. It combines an **agricultural database**
 (FAOSTAT), a **biological database** (GenBank) and **live weather** into one decision tool.
 The pilot covers 18 rice-growing districts of Tamil Nadu, including all seven Cauvery delta districts.
+
+**What it is, and what it is not.** BlastWatch is an *environmental risk scoring system*: it rates how
+favourable the coming weather is for blast infection. It is **not** a validated disease prediction model.
+That needs ground truth (date, place, variety, crop stage and observed severity), which it collects
+through field checks and verified farmer reports but does not have yet (see Calibration).
+
+## Data sources: what is live
+
+| Source | Status | What it is |
+|---|---|---|
+| Open-Meteo forecast (ECMWF IFS, about 9 km) | **Live**, every 3 h, districts and blocks | Hourly forecast for 7 days, plus 3 past days. Model output, not observation |
+| MET Norway | **Live** fallback when Open-Meteo fails | About 2.5 days of hourly forecast |
+| Open-Meteo Ensemble (ECMWF, GEFS, ICON) | **Live**, every 6 h, districts only | 122 members, used for P(High) and forecast confidence |
+| Open-Meteo Previous Runs | Backfill and backtest only | Archived forecasts at a fixed lead, from 2024-01-22 |
+| NASA POWER | Backtest only | Historical reanalysis. Gives an upper bound on skill, not a real-time input |
+| Field sensors (`POST /api/sensors/readings`) | Endpoint works; **no sensor deployed** | Tested with the virtual station only |
+| TAWN (Tamil Nadu Agricultural Weather Network) | **Not integrated** | Identified as a source of block-level station observations. No data access confirmed, so nothing is ingested |
+| FAOSTAT | Research page only | National annual rice area, production, yield |
+| GenBank | Research page only | Resistance-gene sequence records. Not pathogen race status in any field, and not used by the warnings |
+| Field observations | Collected, too few to calibrate | Field checks and officer-verified farmer reports (see Calibration) |
+
+A source moves to "live" only when the path source → retrieval → ingestion → database → timestamp → risk
+engine runs and is logged in `ingest_run` (`GET /api/health`).
 
 ## Who it is for
 
@@ -185,6 +208,12 @@ On the same run, 15 district-nights had one centre at ≥ 50 % and another below
 - `/ensemble.html` shows a P(High) heatmap (districts × nights, with the rule-based level marked), the
   score spread for a district, and each centre's P(High) side by side, with a table view.
 - The officer view shows P(High) under each day and in the day tooltip.
+- **Forecast confidence** (High / Moderate / Low) is the share of pooled members that give the same level
+  as the rule-based forecast (≥ 70 % High, ≥ 40 % Moderate; `[confidence]` in `risk_rules.toml`). It is
+  always Low when the data is not fresh or the night is beyond the 3-day alert horizon. It is
+  confidence in the weather forecast, not in a blast outcome, and the officer view says so. The officer
+  view's "why" card shows it with the riskiest near day's level, its reasons, crop stage of enrolled
+  farmers, data age, the evidence behind the rules and the recommended action.
 - An experimental **ensemble action** (≥ 2 of the next 3 nights with P(High) ≥ 50 %, `[ensemble] alert_p`)
   is reported next to the rule-based action for comparison. **Alerts still follow the rule-based
   forecast.**
@@ -296,6 +325,10 @@ The verdict becomes an observation for calibration: present if confirmed, absent
 - Every ingest attempt is logged (`ingest_run`). The forecast is **fresh** < 6 h, **stale** < 24 h
   (banner warning, last good data shown), otherwise **expired** (alerts paused, districts show "No data").
 - `GET /api/health` reports per-source last success and failure.
+- **Missing values are unknown, never dry.** An hour without temperature or any wetness signal is not
+  scored, and a night with fewer than `min_hours_per_window` scorable hours gets no level at all ("No
+  data"), so a provider gap cannot show up as a false Low. A sensor reading without humidity or leaf
+  wetness does not replace complete grid weather for that hour.
 
 ## Field sensors (IoT)
 
@@ -314,7 +347,11 @@ recomputed immediately. One station per district is the intended setup.
 
 1. Collect presence **and absence** records from KVK / agriculture-department pest surveillance, TNAU
    reports or papers into a CSV shaped like [seed/observations_template.csv](blastwatch/seed/observations_template.csv)
-   (`district,state,date,blast_present,severity,source,note`).
+   (`district,state,date,blast_present,severity,source,note,block,variety,crop_stage`). The last three are
+   optional, but a record without them can only test the weather rules; it cannot show how variety or
+   crop stage change risk. Field checks in the officer view take the same details (with severity as an
+   IRRI SES 0–9 score), and verified farmer reports fill block, variety and stage from the enrolment.
+   The Research page counts how many records are complete.
 2. `observations import FILE`, then `backfill` the same period, then
    `backtest --weather archive-forecast:d3`. Officer-verified farmer reports are added as observations
    automatically.

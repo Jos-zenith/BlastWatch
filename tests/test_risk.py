@@ -87,6 +87,15 @@ def test_incomplete_window_is_skipped():
     assert score_series(series(10, 25, 96), RULES, "default") == []
 
 
+def test_hours_without_humidity_are_unknown_not_dry():
+    # A provider returning nulls for most of a night must give no score, not a false Low.
+    hours = series(24, 25, 96)
+    gappy = hours[:6] + [HourObs(h.ts, h.temp_c, None) for h in hours[6:]]
+    assert score_series(gappy, RULES, "default") == []
+    no_temp = [HourObs(h.ts, None, h.rh_pct) for h in hours]
+    assert score_series(no_temp, RULES, "default") == []
+
+
 def test_susceptibility_scales_score():
     full = score_window(wet_night(), RULES, 1.0, date(2025, 11, 10))
     half = score_window(wet_night(), RULES, 0.5, date(2025, 11, 10))

@@ -109,7 +109,16 @@ onMounted(async () => {
           <span class="muted small">Field checks · confirmed farmer reports</span>
           <b>{{ validation.observations.from_field_checks }} · {{ validation.observations.from_farmer_reports }}</b>
         </div>
+        <div class="tile">
+          <span class="muted small">Complete records (block, variety, stage, severity)</span>
+          <b>{{ validation.observations.complete }} / {{ validation.observations.present + validation.observations.absent }}</b>
+        </div>
       </div>
+      <p class="small muted">Presence and absence alone can test the weather rules. Learning how variety and crop stage
+        change risk needs complete records: {{ validation.observations.with_block }} have a block,
+        {{ validation.observations.with_variety }} a variety, {{ validation.observations.with_stage }} a crop stage, and
+        {{ validation.observations.with_severity }} of {{ validation.observations.present }} positives a severity score.
+        Until then this is an environmental risk score, not a validated disease model.</p>
 
       <h3>Public surveillance records: audited</h3>
       <p class="small">We looked for outbreak records to backtest against. {{ validation.audit.source }},

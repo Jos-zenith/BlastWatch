@@ -65,6 +65,18 @@ def leaf_wetness(obs: HourObs, rules: dict) -> tuple[bool, str | None]:
     return False, None
 
 
+def has_wetness_signal(obs: HourObs) -> bool:
+    """Whether any wetness signal exists this hour, regardless of the configured priority."""
+    return (obs.leaf_wet_min is not None or obs.leaf_wet_prob is not None or obs.rh_pct is not None
+            or (obs.dew_point_c is not None and obs.temp_c is not None))
+
+
+def is_scorable(obs: HourObs, rules: dict) -> bool:
+    """An hour with no temperature or no wetness signal is unknown, not dry. Scoring it as dry
+    would turn a provider gap into a false Low."""
+    return obs.temp_c is not None and leaf_wetness(obs, rules)[1] is not None
+
+
 def is_conducive(obs: HourObs, rules: dict) -> bool:
     c = rules["conducive_hour"]
     if obs.temp_c is None or not c["min_temp_c"] <= obs.temp_c <= c["max_temp_c"]:
@@ -141,11 +153,15 @@ def score_window(hours: list[HourObs], rules: dict, susceptibility: float, day: 
 
 
 def score_series(hours: list[HourObs], rules: dict, state: str) -> list[DayRisk]:
-    """Score every complete infection-night window in an hourly series."""
+    """Score every complete infection-night window in an hourly series.
+
+    Only scorable hours count towards `min_hours_per_window`. A window short of them gets no
+    score at all, so the dashboard shows "No data" rather than a Low it cannot support."""
     start_hour = rules.get("window_start_hour", 12)
     windows: dict[date, list[HourObs]] = defaultdict(list)
     for h in hours:
-        windows[window_date(h.ts, start_hour)].append(h)
+        if is_scorable(h, rules):
+            windows[window_date(h.ts, start_hour)].append(h)
 
     results = []
     for day in sorted(windows):

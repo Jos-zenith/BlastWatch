@@ -51,6 +51,9 @@ def import_observations(session: Session, path: Path) -> int:
                 "severity": (r.get("severity") or "").strip() or None,
                 "source": r["source"].strip(),
                 "note": (r.get("note") or "").strip() or None,
+                "block": (r.get("block") or "").strip() or None,
+                "variety": (r.get("variety") or "").strip() or None,
+                "crop_stage": (r.get("crop_stage") or "").strip().lower() or None,
             })
     if unknown:
         raise ValueError(f"unknown districts (add them to seed/districts.csv first): {sorted(unknown)}")

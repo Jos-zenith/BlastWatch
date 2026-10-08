@@ -123,9 +123,11 @@ def test_checkin_reply_and_verification_become_an_observation(seeded):
         assert farmers.record_reply(s, "+91-unknown", "yes") is None
         assert s.scalar(select(Observation.id)) is None  # a farmer's YES alone is not an observation
 
-        farmers.verify_report(s, followup.id, "confirmed", "leaf blast, 3 hills")
+        farmers.verify_report(s, followup.id, "confirmed", "leaf blast, 3 hills", rules=RULES)
         obs = s.scalars(select(Observation)).one()
         assert obs.blast_present and obs.source == f"farmer-report:{followup.id}"
+        # The observation carries what the model will need to learn variety and stage effects.
+        assert (obs.variety, obs.crop_stage) == ("CO 51", "vegetative")
         assert obs.district_id == sub.district_id and obs.date == followup.answered_at.date()
         farmers.verify_report(s, followup.id, "rejected", "brown spot")  # officer revises the verdict
         assert not s.scalars(select(Observation)).one().blast_present

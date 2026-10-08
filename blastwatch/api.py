@@ -100,6 +100,9 @@ class FieldCheckIn(BaseModel):
     checked_on: date | None = None  # defaults to today
     fields_checked: int | None = Field(None, ge=1, le=500)
     block: str | None = Field(None, max_length=80)
+    variety: str | None = Field(None, max_length=80)
+    crop_stage: Literal["vegetative", "booting", "heading", "ripening"] | None = None
+    severity_ses: int | None = Field(None, ge=0, le=9)  # IRRI Standard Evaluation System score
     note: str = Field("", max_length=1000)
 
 
@@ -259,6 +262,10 @@ def create_app(session_factory: Callable[[], Session] = SessionLocal, scheduler:
                      "susceptibility": r.susceptibility, "wetness_basis": r.wetness_basis,
                      "points": score_points(r.longest_wet_run, r.wet_hours, r.rain_mm, r.mean_cloud_pct, rules),
                      "p_high": pooled[(d.id, r.date)].p_high if (d.id, r.date) in pooled else None,
+                     "confidence": ensemble.forecast_confidence(
+                         r.level, *((pooled[(d.id, r.date)].p_high, pooled[(d.id, r.date)].p_moderate)
+                                    if (d.id, r.date) in pooled else (None, None)),
+                         (r.date - today).days, fresh["status"], rules),
                      "ens_members": pooled[(d.id, r.date)].members if (d.id, r.date) in pooled else None,
                      "blocks": block_roll.get((d.id, r.date)),
                      "level_blocks": blocks.share_level(block_roll[(d.id, r.date)], share)
@@ -321,12 +328,15 @@ def create_app(session_factory: Callable[[], Session] = SessionLocal, scheduler:
                 raise HTTPException(404, "alert not found for this district")
         check = FieldCheck(district_id=district.id, alert_id=c.alert_id, checked_on=checked_on,
                            blast_found=c.blast_found, fields_checked=c.fields_checked, block=c.block,
+                           variety=c.variety, crop_stage=c.crop_stage, severity_ses=c.severity_ses,
                            note=c.note or None, created_at=datetime.now())
         session.add(check)
         session.flush()
         source = f"field-check:{check.id}"
         session.add(Observation(district_id=district.id, date=checked_on, blast_present=c.blast_found,
-                                source=source, note=c.note or None))
+                                source=source, note=c.note or None, block=c.block, variety=c.variety,
+                                crop_stage=c.crop_stage,
+                                severity=None if c.severity_ses is None else f"SES {c.severity_ses}"))
         session.commit()
         return {"id": check.id, "observation": source}
 
@@ -339,7 +349,8 @@ def create_app(session_factory: Callable[[], Session] = SessionLocal, scheduler:
             .order_by(FieldCheck.checked_on.desc(), FieldCheck.id.desc())
         ).all()
         return [{"id": c.id, "alert_id": c.alert_id, "checked_on": c.checked_on, "blast_found": c.blast_found,
-                 "fields_checked": c.fields_checked, "block": c.block, "note": c.note} for c in rows]
+                 "fields_checked": c.fields_checked, "block": c.block, "variety": c.variety,
+                 "crop_stage": c.crop_stage, "severity_ses": c.severity_ses, "note": c.note} for c in rows]
 
     @app.post("/api/sensors/readings", status_code=202)
     def sensor_readings(batch: SensorBatch, x_api_key: str = Header(""), session: Session = Depends(get_session)):
@@ -691,6 +702,14 @@ def create_app(session_factory: Callable[[], Session] = SessionLocal, scheduler:
                 "from_field_checks": session.scalar(select(func.count(FieldCheck.id))),
                 "from_farmer_reports": session.scalar(select(func.count(Followup.id)).where(
                     Followup.officer_status == "confirmed")),
+                # Ground truth is date + place + variety + stage + severity. Presence-only records can
+                # test the weather rules; only complete ones can show how variety and stage matter.
+                "with_block": sum(o.block is not None for o in obs),
+                "with_variety": sum(o.variety is not None for o in obs),
+                "with_stage": sum(o.crop_stage is not None for o in obs),
+                "with_severity": sum(o.severity is not None for o in obs if o.blast_present),
+                "complete": sum(o.block is not None and o.variety is not None and o.crop_stage is not None
+                                and (o.severity is not None or not o.blast_present) for o in obs),
             },
             "required": {"present": criteria["min_present"], "absent": criteria["min_absent"],
                          "districts_with_present": criteria["min_districts_with_present"],

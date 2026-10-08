@@ -294,10 +294,10 @@ onBeforeUnmount(() => { clearInterval(tick); clearInterval(poll); map?.remove();
         <div class="tile"><span class="muted small">Today's score</span><b>{{ reading ? `${Math.round(reading.score)} / 100` : "–" }}</b>
           <span v-if="reading" class="badge" :style="{ '--c': LEVEL_COLORS[reading.level] }">{{ reading.level }}</span></div>
         <div class="tile"><span class="muted small">Longest wet run</span><b>{{ reading ? `${reading.longest_wet_run} h` : "–" }}</b></div>
-        <div class="tile"><span class="muted small">Wet hours</span><b>{{ reading ? `${reading.wet_hours} h` : "–" }}</b></div>
+        <div class="tile"><span class="muted small" title="Hours with a wet leaf at 20–30 °C">Conducive hours</span><b>{{ reading ? `${reading.wet_hours} h` : "–" }}</b></div>
         <div class="tile"><span class="muted small">Wetness from</span><b>{{ reading ? BASIS[reading.wetness_basis] || "—" : "–" }}</b></div>
       </div>
-      <h3>Humidity and leaf wetness (%)</h3>
+      <h3>Humidity and sensor leaf wetness (%)</h3>
       <ChartCanvas :config="wetChart" height="150px" />
       <h3>Temperature (°C)</h3>
       <ChartCanvas :config="tempChart" height="150px" />

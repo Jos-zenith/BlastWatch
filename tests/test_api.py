@@ -90,6 +90,22 @@ def test_sensor_readings_override_grid_weather(client, seeded, monkeypatch):
     assert today.longest_wet_run == 17 and today.level == "High"
 
 
+def test_sensor_without_wetness_does_not_mask_grid_weather(client, seeded, monkeypatch):
+    monkeypatch.setattr(config, "INGEST_KEY", "secret")
+    # Grid weather says Thanjavur's night is wet; a sensor reporting only temperature must not
+    # turn those hours dry and drop the day to Low.
+    start = datetime.combine(date.today() - timedelta(days=1), datetime.min.time()).replace(hour=12)
+    readings = [{"ts": (start + timedelta(hours=i)).isoformat(), "temp_c": 25.0} for i in range(24)]
+    res = client.post("/api/sensors/readings", headers={"X-API-Key": "secret"},
+                      json={"station_id": "TNJ-01", "district": "thanjavur", "readings": readings})
+    assert res.status_code == 202
+    with seeded() as s:
+        d = s.scalar(select(District).where(District.name == "Thanjavur"))
+        today = s.scalar(select(RiskDaily).where(RiskDaily.district_id == d.id, RiskDaily.date == date.today(),
+                                                 RiskDaily.model_version == load_rules()["model_version"]))
+    assert today.wetness_basis == "rh" and today.level == "High"
+
+
 def test_production_and_genes(client):
     prod = client.get("/api/production", params={"areas": ["India", "Nowhere"]}).json()
     assert prod["series"]["India"][0]["year"] == 2024
@@ -123,7 +139,8 @@ def test_field_check_becomes_an_observation(client, seeded):
         alerts.evaluate(s, load_rules())
     tid, mid = ids(client)["Thanjavur"], ids(client)["Madurai"]
     [alert] = client.get("/api/alerts").json()
-    body = {"blast_found": True, "fields_checked": 5, "note": "leaf blast in 2 fields", "alert_id": alert["id"]}
+    body = {"blast_found": True, "fields_checked": 5, "note": "leaf blast in 2 fields", "alert_id": alert["id"],
+            "block": "Budalur", "variety": "ADT 43", "crop_stage": "booting", "severity_ses": 5}
     res = client.post(f"/api/districts/{tid}/field-checks", json=body)
     assert res.status_code == 201
     # A routine visit with no alert counts; another district's alert does not.
@@ -134,8 +151,14 @@ def test_field_check_becomes_an_observation(client, seeded):
     with seeded() as s:
         from blastwatch.models import Observation
         obs = {o.source: o for o in s.scalars(select(Observation))}
-    assert obs[res.json()["observation"]].blast_present is True
+    found = obs[res.json()["observation"]]
+    assert found.blast_present is True
+    assert (found.block, found.variety, found.crop_stage, found.severity) == ("Budalur", "ADT 43", "booting", "SES 5")
     assert len(obs) == 2
+    bad_ses = {"blast_found": True, "severity_ses": 10}
+    assert client.post(f"/api/districts/{tid}/field-checks", json=bad_ses).status_code == 422
+    counts = client.get("/api/validation").json()["observations"]
+    assert counts["complete"] == 1 and counts["with_variety"] == 1
     checks = client.get(f"/api/districts/{tid}/field-checks").json()
     assert checks[0]["blast_found"] is True and checks[0]["fields_checked"] == 5
     outlook = {d["name"]: d for d in client.get("/api/outlook").json()["districts"]}

@@ -206,3 +206,22 @@ def ensemble_action(days: list[dict], rules: dict, today: date) -> str | None:
     if any(d["p_high"] + d["p_moderate"] >= 0.5 or d["p_high"] >= 0.2 for d in days):
         return "watch"
     return "none"
+
+
+def forecast_confidence(level: str, p_high: float | None, p_moderate: float | None, lead_days: int,
+                        fresh_status: str, rules: dict) -> dict:
+    """How far the weather forecast behind a level can be trusted: "High", "Moderate", "Low", or
+    None when no ensemble covers the night. It is the share of pooled ensemble members that score
+    the same level, capped by data age and lead time. It says nothing about whether blast follows:
+    that needs observations (see Calibration)."""
+    c = rules.get("confidence", {})
+    if fresh_status != "fresh":
+        return {"level": "Low", "reason": "stale"}
+    if lead_days >= rules["alerts"]["horizon_days"]:
+        return {"level": "Low", "reason": "lead"}
+    if p_high is None or p_moderate is None:
+        return {"level": None, "reason": "no_ensemble"}
+    agree = {"High": p_high, "Moderate": p_moderate}.get(level, 1.0 - p_high - p_moderate)
+    tier = ("High" if agree >= c.get("high_agree", 0.7)
+            else "Moderate" if agree >= c.get("moderate_agree", 0.4) else "Low")
+    return {"level": tier, "reason": "agreement", "agree": round(agree, 2)}

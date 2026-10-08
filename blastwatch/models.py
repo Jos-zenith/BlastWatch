@@ -209,7 +209,10 @@ class IngestRun(Base):
 
 
 class Observation(Base):
-    """Field-confirmed presence/absence of blast, used to calibrate the model."""
+    """Field-confirmed presence/absence of blast: the ground truth the model is calibrated against.
+
+    A complete record has date, place (district and block), variety, crop stage and severity, so a
+    later model can learn how variety and stage change risk instead of assuming it."""
     __tablename__ = "observation"
     __table_args__ = (UniqueConstraint("district_id", "date", "source"),)
 
@@ -217,9 +220,13 @@ class Observation(Base):
     district_id: Mapped[int] = mapped_column(ForeignKey("district.id"), index=True)
     date: Mapped[date] = mapped_column(Date)
     blast_present: Mapped[bool] = mapped_column(Boolean)
+    # Free text in imported records; "SES n" (IRRI Standard Evaluation System, 0-9) from field checks.
     severity: Mapped[str | None] = mapped_column(String(20))
     source: Mapped[str] = mapped_column(String(120))
     note: Mapped[str | None] = mapped_column(Text)
+    block: Mapped[str | None] = mapped_column(String(80))
+    variety: Mapped[str | None] = mapped_column(String(80))
+    crop_stage: Mapped[str | None] = mapped_column(String(12))  # vegetative | booting | heading | ripening
 
 
 class Alert(Base):
@@ -252,6 +259,9 @@ class FieldCheck(Base):
     blast_found: Mapped[bool] = mapped_column(Boolean)
     fields_checked: Mapped[int | None] = mapped_column(Integer)
     block: Mapped[str | None] = mapped_column(String(80))
+    variety: Mapped[str | None] = mapped_column(String(80))
+    crop_stage: Mapped[str | None] = mapped_column(String(12))
+    severity_ses: Mapped[int | None] = mapped_column(Integer)  # IRRI SES 0-9, worst field seen
     note: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime)
 

@@ -24,6 +24,7 @@ from sqlalchemy.orm import Session
 from . import blocks, notify
 from .alerts import format_dates, upcoming_high_days
 from .models import District, FarmerMessage, Followup, Observation, Subscriber
+from .risk import load_rules
 from .runs import freshness
 from .stage import CropVariety, Stage, crop_stage, load_crop_calendar
 
@@ -213,8 +214,9 @@ def record_reply(session: Session, contact: str, answer: str, now: datetime | No
 
 
 def verify_report(session: Session, followup_id: int, status: str, note: str = "",
-                  now: datetime | None = None) -> Followup:
-    """Officer verdict on a YES/NOT SURE report; it becomes a calibration Observation.
+                  now: datetime | None = None, rules: dict | None = None) -> Followup:
+    """Officer verdict on a YES/NOT SURE report; it becomes a calibration Observation, carrying the
+    farmer's block, variety and the crop stage on the day they answered.
 
     A rejected report (e.g. brown spot, not blast) is recorded as an absence in that field.
     """
@@ -230,5 +232,8 @@ def verify_report(session: Session, followup_id: int, status: str, note: str = "
         obs = Observation(district_id=sub.district_id, date=followup.answered_at.date(), source=source)
         session.add(obs)
     obs.blast_present, obs.note = status == "confirmed", note or None
+    stage = stage_of(sub, followup.answered_at.date(), rules or load_rules(), load_crop_calendar()).name
+    obs.block, obs.variety = sub.block, sub.variety
+    obs.crop_stage = stage if stage in ("vegetative", "booting", "heading", "ripening") else None
     session.commit()
     return followup

@@ -1,1 +1,1 @@
-district,state,date,blast_present,severity,source,note
+district,state,date,blast_present,severity,source,note,block,variety,crop_stage

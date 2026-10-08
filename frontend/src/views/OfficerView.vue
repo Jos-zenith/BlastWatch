@@ -20,6 +20,10 @@ const flash = ref(new Set());
 const copied = ref("");
 const busy = ref(false);
 const loadError = ref(false);
+// Optional details for a field check: with them an observation records place, variety, stage and severity.
+const STAGES = ["vegetative", "booting", "heading", "ripening"];
+const emptyCheck = () => ({ block: "", variety: "", crop_stage: "", severity_ses: "" });
+const checkForm = ref(emptyCheck());
 
 const mapEl = ref(null);
 const detailEl = ref(null);
@@ -38,9 +42,27 @@ const freshness = computed(() => {
   const f = data.value?.freshness;
   if (!f) return { cls: loadError.value ? "expired" : "fresh", text: loadError.value ? T("never") : "…" };
   if (!f.last_success) return { cls: f.status, text: T("never") };
-  if (f.status === "fresh") return { cls: f.status, text: T("fresh")(f.age_hours < 1 ? "<1" : Math.round(f.age_hours), f.source) };
+  if (f.status === "fresh") {
+    const text = f.age_hours < 1 ? T("fresh_min")(Math.max(1, Math.round(f.age_hours * 60)), f.source)
+      : T("fresh")(Math.round(f.age_hours), f.source);
+    return { cls: f.status, text };
+  }
   if (f.status === "stale") return { cls: f.status, text: T("stale")(Math.round(f.age_hours)) };
   return { cls: f.status, text: T("expired") };
+});
+// The "why" card explains the riskiest of the next 3 days (the earliest one on a tie).
+const focusDay = computed(() => (district.value?.days || []).filter((x) => x.horizon === "near")
+  .reduce((best, x) => (best == null || x.score > best.score ? x : best), null));
+const confidence = computed(() => {
+  const c = focusDay.value?.confidence;
+  if (!c) return { level: null, text: T("conf_none") };
+  const text = { stale: T("conf_stale"), lead: T("conf_lead"), no_ensemble: T("conf_none"),
+    agreement: T("conf_agree")(Math.round((c.agree ?? 0) * 100), focusDay.value.ens_members) }[c.reason];
+  return { level: c.level, text };
+});
+const cropLine = computed(() => {
+  const f = district.value?.farmers;
+  return f?.subscribers ? T("why_crop")(f.susceptible, f.subscribers) : T("why_crop_none");
 });
 const bases = computed(() => [...new Set((district.value?.days || []).map((x) => x.wetness_basis).filter(Boolean))]);
 const ruleLine = computed(() => {
@@ -120,6 +142,7 @@ async function selectDistrict(id, fromList = false) {
     blockData.value = null;
     selectedBlock.value = null;
     blockMessage.value = null;
+    checkForm.value = emptyCheck();
   }
   // On phones the detail sits below the list; bring it into view after a tap.
   if (fromList && window.matchMedia("(max-width: 900px)").matches) {
@@ -159,7 +182,13 @@ async function recordCheck(found) {
   const d = district.value;
   busy.value = true;
   try {
-    await post(`/api/districts/${d.id}/field-checks`, { blast_found: found, alert_id: districtAlert.value?.id ?? null });
+    const f = checkForm.value;
+    await post(`/api/districts/${d.id}/field-checks`, {
+      blast_found: found, alert_id: districtAlert.value?.id ?? null,
+      block: f.block || null, variety: f.variety || null, crop_stage: f.crop_stage || null,
+      severity_ses: found && f.severity_ses !== "" ? Number(f.severity_ses) : null,
+    });
+    checkForm.value = emptyCheck();
     checks.value = await api(`/api/districts/${d.id}/field-checks`);
   } finally { busy.value = false; }
 }
@@ -286,7 +315,32 @@ onBeforeUnmount(() => { clearInterval(timer); map?.remove(); });
             <h2>{{ localName(district) }}</h2>
             <span class="badge" :style="{ '--c': ACTION_COLORS[district.action] }">{{ T("action_" + district.action) }}</span>
           </div>
-          <p>{{ T("todo_" + district.action) }}</p>
+          <p v-if="!focusDay">{{ T("todo_" + district.action) }}</p>
+          <div v-else class="why-card" :style="{ '--c': LEVEL_COLORS[focusDay.level] }">
+            <div class="why-head">
+              <span class="muted small">{{ T("why_title") }} · {{ dayName(focusDay.date) }}</span>
+              <b class="why-level">{{ T("level_" + focusDay.level) }}</b>
+              <span>{{ T("why_conf") }}: <b>{{ confidence.level ? T("level_" + confidence.level) : "–" }}</b>
+                <span class="muted small"> ({{ confidence.text }})</span></span>
+              <span class="muted small">{{ T("conf_hint") }}</span>
+            </div>
+            <h4>{{ T("why_because") }}</h4>
+            <ul class="small">
+              <li>{{ T("why_run_line")(focusDay.longest_wet_run) }}</li>
+              <li>{{ T("why_hours_line")(focusDay.leaf_wet_hours) }}</li>
+              <li v-if="focusDay.mean_temp_c != null">{{ T("why_temp_line")(focusDay.mean_temp_c) }}</li>
+              <li>{{ T("why_rain_line")(focusDay.rain_mm) }}</li>
+              <li v-if="focusDay.mean_cloud_pct != null">{{ T("why_cloud_line")(focusDay.mean_cloud_pct) }}</li>
+              <li v-if="focusDay.wetness_basis">{{ T("why_basis_line")(T("basis")[focusDay.wetness_basis] || focusDay.wetness_basis) }}</li>
+              <li>{{ cropLine }}</li>
+            </ul>
+            <dl class="small why-meta">
+              <dt>{{ T("why_data") }}</dt><dd>{{ freshness.text }}</dd>
+              <dt>{{ T("why_evidence") }}</dt><dd>{{ T("why_evidence_text")(data.model_version) }}</dd>
+            </dl>
+            <p class="why-warn small">⚠ {{ T("why_warning") }}</p>
+            <p class="why-action"><b>{{ T("why_action") }}:</b> {{ T("todo_" + district.action) }}</p>
+          </div>
           <DayStrip :days="district.days" big />
           <p class="muted small">
             <template v-if="bases.length">{{ T("based_on") }}: {{ bases.map((b) => T("basis")[b] || b).join(", ") }}</template>
@@ -365,6 +419,25 @@ onBeforeUnmount(() => { clearInterval(timer); map?.remove(); });
 
           <h3>{{ T("field_check") }}</h3>
           <p class="muted small">{{ T("field_check_hint") }}</p>
+          <p class="muted small">{{ T("check_optional") }}</p>
+          <div class="check-form small">
+            <label>{{ T("block") }}
+              <select v-model="checkForm.block">
+                <option value="">–</option>
+                <option v-for="b in blockData?.blocks || []" :key="b.id" :value="b.name">{{ localName(b) }}</option>
+              </select></label>
+            <label>{{ T("check_variety") }} <input v-model.trim="checkForm.variety" maxlength="80"></label>
+            <label>{{ T("check_stage") }}
+              <select v-model="checkForm.crop_stage">
+                <option value="">–</option>
+                <option v-for="s in STAGES" :key="s" :value="s">{{ T("stage")[s] }}</option>
+              </select></label>
+            <label>{{ T("check_ses") }}
+              <select v-model="checkForm.severity_ses">
+                <option value="">–</option>
+                <option v-for="n in 10" :key="n" :value="n - 1">{{ n - 1 }}</option>
+              </select></label>
+          </div>
           <div class="msg-actions">
             <button :disabled="busy" @click="recordCheck(true)">{{ T("found_yes") }}</button>
             <button :disabled="busy" @click="recordCheck(false)">{{ T("found_no") }}</button>
