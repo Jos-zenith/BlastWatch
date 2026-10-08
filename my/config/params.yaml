@@ -1,0 +1,49 @@
+# EVERY number below is a HYPOTHESIS to be tested by eval/evaluate.py and by
+# extension-officer review. None is a calibrated or sourced parameter.
+# Change here, never in code. The evaluation prints a hash of this file.
+status: unvalidated
+
+weather:
+  forecast_days: 7
+  # Open-Meteo gives gridded model values (~9-25 km), NOT in-canopy conditions.
+  # Many blocks will share one grid cell; weather is NOT the differentiator here.
+
+favorable_hour:            # an hour counts as "blast-favorable" if ALL hold
+  rh_min: 90               # %
+  temp_min: 20             # C
+  temp_max: 30             # C
+  use_wind: false          # 10 m wind says little about canopy air; off until tested
+  wind_max_ms: 1.5
+  rain_counts_as_wet: true # precipitation >= rain_mm counts as wet even if RH < rh_min
+  rain_mm: 0.1
+
+alert:
+  window_days: 3           # look ahead
+  min_favorable_hours_per_day: 10
+  min_favorable_days: 2    # in window  -> HIGH
+  watch_min_favorable_days: 1   # -> WATCH (internal/officer only, no farmer message)
+  cooldown_days: 5         # no repeat farmer alert for same block+stage within this
+
+stages:                    # fraction of variety duration, since crop establishment
+  # Boundaries are hypotheses; replace with TNAU package-of-practices values per variety.
+  - {name: vegetative, from: 0.00, to: 0.45, susceptible: true}
+  - {name: booting,    from: 0.45, to: 0.62, susceptible: true}
+  - {name: heading,    from: 0.62, to: 0.75, susceptible: true}
+  - {name: ripening,   from: 0.75, to: 1.05, susceptible: false}
+# Farmers get an alert only if their stage is susceptible.
+
+establishment:
+  # Transplanted: age = days_after_transplanting + nursery_age_days (variety-specific
+  # in varieties.yaml; this default is used ONLY if missing and is flagged in the DB).
+  default_nursery_age_days: 21
+  # Direct-seeded: age = days_after_sowing. No nursery offset.
+
+feedback:
+  followup_days: [7, 14]       # lesions take days to show; 48h would be too early
+  no_alert_checkin_fraction: 0.15   # sample of non-alerted subscribers asked too
+  officer_verification_required: true  # a farmer "yes" never marks a block confirmed
+  min_reports_before_officer_review: 1
+
+notify:
+  channel: outbox          # outbox | telegram  (WhatsApp/SMS adapters: see notify.py)
+  language_default: ta

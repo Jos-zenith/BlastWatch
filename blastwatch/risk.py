@@ -35,6 +35,7 @@ class DayRisk:
     susceptibility: float
     is_forecast: bool
     wetness_basis: str | None = None
+    mean_cloud_pct: float | None = None
 
 
 def load_rules(path: Path = config.RULES_PATH) -> dict:
@@ -84,8 +85,24 @@ def level_for(score: float, rules: dict) -> str:
     return "Low"
 
 
-def score_window(hours: list[HourObs], rules: dict, susceptibility: float, day: date) -> DayRisk:
+def score_points(longest_run: int, wet_hours: int, rain_mm: float, mean_cloud_pct: float | None,
+                 rules: dict) -> dict[str, float]:
+    """Points per factor before the susceptibility multiplier; the officer view shows them."""
     s = rules["score"]
+
+    def ramp(value: float, start: float, full: float) -> float:
+        """0 at or below `start`, 1 at or above `full`, linear between."""
+        return min(max((value - start) / (full - start), 0.0), 1.0)
+
+    return {
+        "run": round(ramp(longest_run, s.get("run_start_hours", 0), s["full_run_hours"]) * s["run_weight"], 1),
+        "hours": round(ramp(wet_hours, s.get("wet_start_hours", 0), s["full_wet_hours"]) * s["hours_weight"], 1),
+        "rain": s["rain_weight"] if s["rain_min_mm"] <= rain_mm <= s["rain_max_mm"] else 0,
+        "cloud": s["cloud_weight"] if mean_cloud_pct is not None and mean_cloud_pct >= s["cloud_min_pct"] else 0,
+    }
+
+
+def score_window(hours: list[HourObs], rules: dict, susceptibility: float, day: date) -> DayRisk:
     hours = sorted(hours, key=lambda h: h.ts)
 
     wet_hours = longest = run = 0
@@ -106,13 +123,7 @@ def score_window(hours: list[HourObs], rules: dict, susceptibility: float, day: 
     clouds = [h.cloud_pct for h in hours if h.cloud_pct is not None]
     mean_cloud = sum(clouds) / len(clouds) if clouds else None
 
-    raw = min(longest / s["full_run_hours"], 1.0) * s["run_weight"]
-    raw += min(wet_hours / s["full_wet_hours"], 1.0) * s["hours_weight"]
-    if s["rain_min_mm"] <= rain <= s["rain_max_mm"]:
-        raw += s["rain_weight"]
-    if mean_cloud is not None and mean_cloud >= s["cloud_min_pct"]:
-        raw += s["cloud_weight"]
-
+    raw = sum(score_points(longest, wet_hours, rain, mean_cloud, rules).values())
     score = round(raw * susceptibility, 1)
     return DayRisk(
         date=day,
@@ -125,6 +136,7 @@ def score_window(hours: list[HourObs], rules: dict, susceptibility: float, day: 
         susceptibility=susceptibility,
         is_forecast=any(h.is_forecast for h in hours),
         wetness_basis=bases.most_common(1)[0][0] if bases else None,
+        mean_cloud_pct=round(mean_cloud) if mean_cloud is not None else None,
     )
 
 

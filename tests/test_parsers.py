@@ -67,3 +67,18 @@ def test_genbank_summary_parse():
     [row] = genbank.parse_summary(payload, gene_id=3)
     assert row == {"gene_id": 3, "accession": "KC777366.1", "title": "Oryza sativa Pi54 gene",
                    "length": 1800, "organism": "Oryza sativa", "update_date": "2014/01/01"}
+
+
+def test_previous_runs_parse_uses_lead_suffix_and_drops_uncovered_hours():
+    payload = {"hourly": {
+        "time": ["2024-01-21T23:00", "2024-01-22T00:00"],
+        "temperature_2m_previous_day3": [24.0, 23.5],
+        "relative_humidity_2m_previous_day3": [None, 96.0],
+        "dew_point_2m_previous_day3": [None, 22.8],
+        "precipitation_previous_day3": [0.0, 0.3],
+        "cloud_cover_previous_day3": [80.0, 95.0],
+        "leaf_wetness_probability_previous_day3": [None, 70.0],
+    }}
+    [row] = weather.parse_previous_runs(payload, 4, NOW, lead_days=3)
+    assert row["ts"] == datetime(2024, 1, 22, 0) and row["source"] == "archive-forecast:d3"
+    assert row["rh_pct"] == 96.0 and row["leaf_wet_prob"] == 70.0 and row["is_forecast"] is True

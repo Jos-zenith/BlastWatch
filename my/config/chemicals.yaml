@@ -1,0 +1,9 @@
+# Hand-curated advice table. Doses and products MUST be checked by a TNAU
+# plant pathologist before any message goes to a farmer. Left as placeholders on purpose.
+# The dev build refuses to send chemical advice while reviewed: false.
+reviewed: false
+advice:
+  high:
+    ta: "அடுத்த சில நாட்களில் குளிர்ந்த, ஈரப்பதமான வானிலை எதிர்பார்க்கப்படுகிறது. யூரியா மேலுரம் இடுவதை தள்ளி வையுங்கள். வயலை தினமும் பாருங்கள். இலையில் கண்ணை போன்ற புள்ளிகள் இருந்தால் வேளாண் அலுவலரை அணுகவும்."
+    en: "Cool, humid weather is expected in the next few days. Hold back urea top-dressing. Check your field daily. If you see eye-shaped leaf spots, contact your agriculture officer."
+  chemical_block: "[Fungicide recommendation withheld: awaiting TNAU review]"

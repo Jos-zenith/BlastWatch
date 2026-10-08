@@ -1,0 +1,33 @@
+# PRE-REGISTERED PASS/FAIL CRITERIA. Commit/tag this file BEFORE running evaluate.py.
+# evaluate.py prints its hash; if you edit it after seeing results, the result is void.
+# All numbers are hypotheses chosen up front, not derived from data.
+
+label:
+  # A block-day is POSITIVE if an outbreak onset (labels.csv) in that block falls in
+  # [day + lead_min, day + lead_max]. Lesions show days after infection, so label is lagged.
+  lead_min_days: 3
+  lead_max_days: 14
+  # What counts as an outbreak row in labels.csv is decided by the labeller and recorded in the
+  # 'definition' column (e.g. "PDI>=X at stage Y", "officer-confirmed field report").
+  # Rows without a definition are dropped.
+
+eval_period:
+  start: "2018-06-01"
+  end: "2025-03-31"
+
+baseline:
+  # Dumb calendar rule: inside the season window, alert in any week with high mean humidity.
+  window_start_mmdd: "10-20"      # hypothesis: Samba booting/heading period
+  window_end_mmdd:   "12-15"
+  weekly_mean_rh_min: 85          # %
+  lookahead_days: 3
+
+pass:
+  min_positive_events: 30         # fewer -> verdict INCONCLUSIVE, not PASS
+  min_blocks_with_events: 3
+  ap_relative_gain_min: 0.25      # model AP >= baseline AP * 1.25
+  bootstrap_ci_excludes_zero: true
+  bootstrap_iterations: 1000
+  bootstrap_cluster: block_month  # resample block-months, not days (days are autocorrelated)
+  min_precision_at_alert: 0.30
+  min_recall_at_alert: 0.50

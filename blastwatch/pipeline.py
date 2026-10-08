@@ -1,9 +1,9 @@
 """Glue between the database and the pure risk engine, plus seed loading."""
 import csv
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from . import config
@@ -12,7 +12,7 @@ from .models import District, Gene, RiskDaily, Variety, WeatherHourly
 from .risk import HourObs, load_rules, score_series
 
 # When several sources cover the same hour: field sensors, then live forecasts, then history.
-SOURCE_PRIORITY = {"sensor": 0, "open-meteo": 1, "met-no": 2, "nasa-power": 3}
+SOURCE_PRIORITY = {"sensor": 0, "open-meteo": 1, "met-no": 2, "nasa-power": 3, "archive-forecast": 4}
 
 
 def source_rank(source: str) -> int:
@@ -28,28 +28,28 @@ def load_seeds(session: Session, seed_dir: Path = config.SEED_DIR) -> dict[str, 
     districts = _read_csv(seed_dir / "districts.csv")
     for d in districts:
         d["lat"], d["lon"] = float(d["lat"]), float(d["lon"])
-        d["rice_area_ha"] = float(d["rice_area_ha"]) if d["rice_area_ha"] else None
-    # Seeds run on every startup; a blank rice area in the CSV must not erase a stored value.
-    with_area = [d for d in districts if d["rice_area_ha"] is not None]
-    without_area = [{k: v for k, v in d.items() if k != "rice_area_ha"} for d in districts
-                    if d["rice_area_ha"] is None]
     genes = _read_csv(seed_dir / "genes.csv")
     varieties = _read_csv(seed_dir / "varieties.csv")
 
     counts = {
-        "districts": upsert(session, District, with_area, ["name", "state"])
-        + upsert(session, District, without_area, ["name", "state"]),
+        "districts": upsert(session, District, districts, ["name", "state"]),
         "genes": upsert(session, Gene, genes, ["symbol"]),
         "varieties": upsert(session, Variety, varieties, ["name"]),
     }
     session.commit()
+    from .blocks import load_block_seed  # blocks reference districts, so they load after them
+
+    counts["blocks"] = load_block_seed(session, seed_dir / "blocks.csv")
     return counts
 
 
-def merged_hours(session: Session, district_id: int) -> list[HourObs]:
-    rows = session.scalars(
-        select(WeatherHourly).where(WeatherHourly.district_id == district_id).order_by(WeatherHourly.ts)
-    ).all()
+def merged_hours(session: Session, district_id: int, source: str | None = None) -> list[HourObs]:
+    """Best row per hour across sources, or only `source` (exact, or a prefix: "archive-forecast"
+    matches "archive-forecast:d3"), so a backtest can pin the weather it is scored on."""
+    query = select(WeatherHourly).where(WeatherHourly.district_id == district_id)
+    if source:
+        query = query.where(or_(WeatherHourly.source == source, WeatherHourly.source.like(f"{source}:%")))
+    rows = session.scalars(query.order_by(WeatherHourly.ts)).all()
     best: dict[datetime, WeatherHourly] = {}
     for r in rows:
         current = best.get(r.ts)
@@ -62,11 +62,35 @@ def merged_hours(session: Session, district_id: int) -> list[HourObs]:
     ]
 
 
-def compute_risk(session: Session, rules: dict | None = None) -> int:
+def level_snapshot(session: Session, rules: dict, since: date, district_ids: list[int] | None = None) -> dict:
+    """{(district_id, date): (level, score)} from `since` on, to report what a recompute changed."""
+    query = select(RiskDaily).where(RiskDaily.model_version == rules["model_version"], RiskDaily.date >= since)
+    if district_ids is not None:
+        query = query.where(RiskDaily.district_id.in_(district_ids))
+    return {(r.district_id, r.date): (r.level, r.score) for r in session.scalars(query)}
+
+
+def level_changes(session: Session, before: dict, after: dict) -> list[dict]:
+    """Days whose level changed between two snapshots (new days count as changes from None)."""
+    names = {d.id: d.name for d in session.scalars(select(District))}
+    changes = []
+    for key in sorted(after, key=lambda k: (k[1], names.get(k[0], ""))):
+        old = before.get(key)
+        if old is None or old[0] != after[key][0]:
+            changes.append({"district_id": key[0], "district": names.get(key[0]), "date": key[1],
+                            "from": old[0] if old else None, "to": after[key][0], "score": after[key][1]})
+    return changes
+
+
+def compute_risk(session: Session, rules: dict | None = None, district_ids: list[int] | None = None) -> int:
+    """Score every district, or only `district_ids` (a sensor upload touches one district)."""
     rules = rules or load_rules()
     now = datetime.now()
     count = 0
-    for district in session.scalars(select(District).order_by(District.id)).all():
+    query = select(District).order_by(District.id)
+    if district_ids is not None:
+        query = query.where(District.id.in_(district_ids))
+    for district in session.scalars(query).all():
         days = score_series(merged_hours(session, district.id), rules, district.state)
         rows = [
             {
@@ -81,6 +105,7 @@ def compute_risk(session: Session, rules: dict | None = None) -> int:
                 "susceptibility": d.susceptibility,
                 "is_forecast": d.is_forecast,
                 "wetness_basis": d.wetness_basis,
+                "mean_cloud_pct": d.mean_cloud_pct,
                 "model_version": rules["model_version"],
                 "computed_at": now,
             }
@@ -97,7 +122,9 @@ def split(value: str | None) -> list[str]:
 
 def advice_for(session: Session, district: District, level: str | None) -> dict:
     """Variety and gene suggestions for a district, worded by current risk level."""
-    varieties = [v for v in session.scalars(select(Variety)) if district.state in split(v.states)]
+    # Breeding lines cannot be bought, so only released varieties are offered.
+    varieties = [v for v in session.scalars(select(Variety))
+                 if district.state in split(v.states) and v.status == "released"]
     genes = session.scalars(select(Gene).where(Gene.role == "host-resistance")).all()
     # The model is uncalibrated, so the action is always to verify in the field first:
     # spraying on a forecast alone wastes fungicide when the forecast is a false alarm.
@@ -113,8 +140,9 @@ def advice_for(session: Session, district: District, level: str | None) -> dict:
     return {
         "level": level,
         "message": messages.get(level, "No risk score available yet."),
-        "next_season": "For future sowings, prefer varieties carrying broad-spectrum resistance "
-        "genes such as Pi9 or Pi54; stacking two genes gives more durable resistance.",
+        # Gene presence does not predict field resistance to local races, so no gene-based advice:
+        # variety advice waits for TNAU field ratings by season.
+        "next_season": None,
         "varieties": [
             {
                 "name": v.name,

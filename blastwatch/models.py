@@ -18,8 +18,6 @@ class District(Base):
     # Point used for weather queries (district headquarters).
     lat: Mapped[float] = mapped_column(Float)
     lon: Mapped[float] = mapped_column(Float)
-    # Rice area from state crop statistics; optional until that dataset is loaded.
-    rice_area_ha: Mapped[float | None] = mapped_column(Float)
 
 
 class WeatherHourly(Base):
@@ -59,8 +57,86 @@ class RiskDaily(Base):
     mean_temp_c: Mapped[float | None] = mapped_column(Float)
     susceptibility: Mapped[float] = mapped_column(Float)
     is_forecast: Mapped[bool] = mapped_column(default=False)
+    mean_cloud_pct: Mapped[float | None] = mapped_column(Float)
     # Which leaf-wetness signal dominated the window: sensor | lwp | dpd | rh.
     wetness_basis: Mapped[str | None] = mapped_column(String(10))
+    model_version: Mapped[str] = mapped_column(String(20))
+    computed_at: Mapped[datetime] = mapped_column(DateTime)
+
+
+class EnsembleDaily(Base):
+    """Risk spread across ensemble members for one district, night and model (see ensemble.py).
+    model is "ecmwf" | "gefs" | "icon", or "all" for the equal-weight pool of the three."""
+    __tablename__ = "ensemble_daily"
+    __table_args__ = (UniqueConstraint("district_id", "date", "model", "model_version"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    district_id: Mapped[int] = mapped_column(ForeignKey("district.id"), index=True)
+    date: Mapped[date] = mapped_column(Date)
+    model: Mapped[str] = mapped_column(String(10))
+    members: Mapped[int] = mapped_column(Integer)
+    p_high: Mapped[float] = mapped_column(Float)
+    p_moderate: Mapped[float] = mapped_column(Float)
+    score_p10: Mapped[float] = mapped_column(Float)
+    score_p50: Mapped[float] = mapped_column(Float)
+    score_p90: Mapped[float] = mapped_column(Float)
+    score_mean: Mapped[float] = mapped_column(Float)
+    wet_hours_p50: Mapped[float] = mapped_column(Float)
+    model_version: Mapped[str] = mapped_column(String(20))
+    run_at: Mapped[datetime] = mapped_column(DateTime)  # when the members were fetched
+
+
+class Block(Base):
+    """A development block (panchayat union), located at its headquarters town.
+    Built by scripts/build_block_seed.py; located_by says how the point was found."""
+    __tablename__ = "block"
+    __table_args__ = (UniqueConstraint("district_id", "name"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    district_id: Mapped[int] = mapped_column(ForeignKey("district.id"), index=True)
+    name: Mapped[str] = mapped_column(String(80))
+    name_ta: Mapped[str | None] = mapped_column(String(80))
+    lat: Mapped[float] = mapped_column(Float)
+    lon: Mapped[float] = mapped_column(Float)
+    located_by: Mapped[str | None] = mapped_column(String(12))  # osm-ta | osm-en | nominatim | wikidata
+    hq_place: Mapped[str | None] = mapped_column(String(80))
+    wikidata: Mapped[str | None] = mapped_column(String(16))
+
+
+class BlockWeatherHourly(Base):
+    """Forecast weather at a block's headquarters (same variables as WeatherHourly)."""
+    __tablename__ = "block_weather_hourly"
+    __table_args__ = (UniqueConstraint("block_id", "ts", "source"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    block_id: Mapped[int] = mapped_column(ForeignKey("block.id"), index=True)
+    ts: Mapped[datetime] = mapped_column(DateTime)
+    temp_c: Mapped[float | None] = mapped_column(Float)
+    rh_pct: Mapped[float | None] = mapped_column(Float)
+    precip_mm: Mapped[float | None] = mapped_column(Float)
+    cloud_pct: Mapped[float | None] = mapped_column(Float)
+    dew_point_c: Mapped[float | None] = mapped_column(Float)
+    leaf_wet_prob: Mapped[float | None] = mapped_column(Float)
+    leaf_wet_min: Mapped[float | None] = mapped_column(Float)
+    source: Mapped[str] = mapped_column(String(20))
+    is_forecast: Mapped[bool] = mapped_column(default=False)
+    fetched_at: Mapped[datetime] = mapped_column(DateTime)
+
+
+class BlockRiskDaily(Base):
+    __tablename__ = "block_risk_daily"
+    __table_args__ = (UniqueConstraint("block_id", "date", "model_version"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    block_id: Mapped[int] = mapped_column(ForeignKey("block.id"), index=True)
+    date: Mapped[date] = mapped_column(Date)
+    score: Mapped[float] = mapped_column(Float)
+    level: Mapped[str] = mapped_column(String(10))
+    wet_hours: Mapped[int] = mapped_column(Integer)
+    longest_wet_run: Mapped[int] = mapped_column(Integer)
+    rain_mm: Mapped[float] = mapped_column(Float)
+    wetness_basis: Mapped[str | None] = mapped_column(String(10))
+    is_forecast: Mapped[bool] = mapped_column(default=False)
     model_version: Mapped[str] = mapped_column(String(20))
     computed_at: Mapped[datetime] = mapped_column(DateTime)
 
@@ -157,6 +233,76 @@ class Alert(Base):
     high_days: Mapped[str] = mapped_column(String(80))  # ";"-separated ISO dates
     message_en: Mapped[str] = mapped_column(Text)
     message_ta: Mapped[str] = mapped_column(Text)
-    status: Mapped[str] = mapped_column(String(12))  # "ready" | "sent"
+    status: Mapped[str] = mapped_column(String(12))  # "ready" | "sent" | "expired"
+    created_at: Mapped[datetime] = mapped_column(DateTime)
+    # When the message text was last generated from the risk rows (refreshed while "ready").
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime)
+    sent_at: Mapped[datetime | None] = mapped_column(DateTime)
+
+
+class FieldCheck(Base):
+    """An officer's field visit: blast found or not. Each one becomes an Observation, so every
+    alert (and every routine visit) adds a labelled data point for calibration."""
+    __tablename__ = "field_check"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    district_id: Mapped[int] = mapped_column(ForeignKey("district.id"), index=True)
+    alert_id: Mapped[int | None] = mapped_column(ForeignKey("alert.id"), index=True)  # None = routine visit
+    checked_on: Mapped[date] = mapped_column(Date)
+    blast_found: Mapped[bool] = mapped_column(Boolean)
+    fields_checked: Mapped[int | None] = mapped_column(Integer)
+    block: Mapped[str | None] = mapped_column(String(80))
+    note: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime)
+
+
+class Subscriber(Base):
+    """A farmer who consented to alerts and check-ins, enrolled by an officer or operator."""
+    __tablename__ = "subscriber"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    contact: Mapped[str] = mapped_column(String(64), unique=True)  # phone number or Telegram chat id
+    channel: Mapped[str] = mapped_column(String(10))  # "outbox" | "telegram"
+    district_id: Mapped[int] = mapped_column(ForeignKey("district.id"), index=True)
+    block: Mapped[str | None] = mapped_column(String(80))  # for officer visits; risk is per district
+    variety: Mapped[str] = mapped_column(String(80))  # as the farmer named it
+    method: Mapped[str] = mapped_column(String(16))  # "transplanted" | "direct_seeded"
+    establish_date: Mapped[date] = mapped_column(Date)  # transplanting or sowing date
+    language: Mapped[str] = mapped_column(String(2))  # "ta" | "en"
+    consent_at: Mapped[datetime] = mapped_column(DateTime)
+    consent_version: Mapped[str] = mapped_column(String(20))
+    active: Mapped[bool] = mapped_column(default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime)
+
+
+class FarmerMessage(Base):
+    """One message to one subscriber: an alert or a check-in question."""
+    __tablename__ = "farmer_message"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    subscriber_id: Mapped[int] = mapped_column(ForeignKey("subscriber.id"), index=True)
+    kind: Mapped[str] = mapped_column(String(10))  # "alert" | "checkin"
+    stage: Mapped[str | None] = mapped_column(String(12))  # crop stage the alert was worded for
+    body: Mapped[str] = mapped_column(Text)
+    # "queued" (waiting for an officer to forward) | "sent" | "failed:<reason>"
+    status: Mapped[str] = mapped_column(String(40))
     created_at: Mapped[datetime] = mapped_column(DateTime)
     sent_at: Mapped[datetime | None] = mapped_column(DateTime)
+
+
+class Followup(Base):
+    """A check-in question: did the farmer see blast symptoms? Verified by an officer."""
+    __tablename__ = "followup"
+    __table_args__ = (UniqueConstraint("subscriber_id", "due_on"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    subscriber_id: Mapped[int] = mapped_column(ForeignKey("subscriber.id"), index=True)
+    due_on: Mapped[date] = mapped_column(Date)
+    origin: Mapped[str] = mapped_column(String(16))  # "alert" | "no_alert_sample"
+    alert_message_id: Mapped[int | None] = mapped_column(ForeignKey("farmer_message.id"))
+    asked_at: Mapped[datetime | None] = mapped_column(DateTime)
+    answered_at: Mapped[datetime | None] = mapped_column(DateTime)
+    answer: Mapped[str | None] = mapped_column(String(8))  # "yes" | "no" | "unsure"
+    officer_status: Mapped[str] = mapped_column(String(12), default="unverified")  # | "confirmed" | "rejected"
+    officer_note: Mapped[str | None] = mapped_column(Text)
+    verified_at: Mapped[datetime | None] = mapped_column(DateTime)

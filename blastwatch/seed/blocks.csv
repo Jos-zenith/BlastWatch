@@ -1,0 +1,175 @@
+district,name,name_ta,lat,lon,located_by,hq_place,wikidata
+Ariyalur,Andimadam,ஆண்டிமடம்,11.3357,79.3747,osm-ta,Andimadam,Q25552692
+Ariyalur,Ariyalur,அரியலூர்,11.1358,79.0723,osm-ta,Ariyalur,Q25552684
+Ariyalur,Jayankondan,ஜெயங்கொண்டம்,11.212,79.3649,osm-ta,Jayankondam,Q25552686
+Ariyalur,Sendurai,செந்துறை,11.2539,79.1772,osm-ta,Sendurai,Q25552748
+Ariyalur,T. Palur,த பழூர்,11.0959,79.3725,osm-en,T.Palur,Q25552746
+Ariyalur,Thirumanur,திருமானூர்,10.9352,79.1035,osm-ta,Thirumanur,Q4111517
+Chengalpattu,Acharapakkam,அச்சரபாக்கம்,12.4077,79.8172,osm-ta,Acharapakkam,Q25552734
+Chengalpattu,Chithamur,சித்தாமூர்,12.4098,79.8912,osm-ta,Chittamur,Q25552740
+Chengalpattu,Kattangulathur,காட்டாங்குளத்தூர்,12.8081,80.0302,osm-ta,Kattangulathur,Q25552729
+Chengalpattu,Lathur,லத்தூர்,12.518,80.1004,osm-en,Lattūr,Q25552737
+Chengalpattu,Madurantakam,மதுராந்தகம்,12.5082,79.8882,osm-en,Maduranthakam,Q25552733
+Chengalpattu,Thirupporur,திருப்போரூர்,12.7259,80.1895,osm-ta,Thiruporur,Q25552722
+Chengalpattu,Tirukalukundram,திருக்கழுக்குன்றம்,12.6021,80.0591,osm-en,Thirukazhukundram,Q25552723
+Cuddalore,Bhuvanagiri,மேல்புவனகிரி,11.4414,79.6488,osm-en,Bhuvanagiri,Q25552798
+Cuddalore,Cuddalore,கடலூர்,11.7564,79.7635,osm-ta,Cuddalore,Q25552784
+Cuddalore,Kattumannarkoil,காட்டுமன்னார்கோயில்,11.2748,79.5525,osm-ta,Kattumannarkoil,Q25552785
+Cuddalore,Komaratchi,குமராட்சி,11.3111,79.628,osm-ta,Komaratchi,Q25552790
+Cuddalore,Kurinjipadi,குறிஞ்சிப்பாடி,11.5667,79.5945,osm-ta,Kurinjippadi,Q25552792
+Cuddalore,Mangalur,மங்கலூர்,11.5159,79.0068,nominatim,Mangalur CHC,Q25552292
+Cuddalore,Panruti,பண்ருட்டி,11.7723,79.5519,osm-ta,Panruti,Q25552793
+Cuddalore,Parangipettai,பரங்கிப்பேட்டை,11.4906,79.7569,osm-ta,Parangipettai,Q25552805
+Cuddalore,Vriddhachalam,விருத்தாச்சலம்,11.5164,79.3288,osm-ta,Virudhachalam,Q25552803
+Erode,Ammapet,,11.6198,77.7426,osm-en,Ammapettai,Q25553169
+Erode,Andiyur,அந்தியூர்,11.5753,77.5886,osm-ta,Anthiyur,Q25553168
+Erode,Bhavani,பவானி,11.4406,77.6824,osm-ta,Bhavani,Q25553172
+Erode,Chennimalai,சென்னிமலை,11.1643,77.6032,osm-ta,Chennimalai,Q25553170
+Erode,Erode,ஈரோடு,11.3306,77.7277,osm-ta,Erode,Q25553161
+Erode,Gobichettipalayam,கோபிச்செட்டிப்பாளையம்,11.4552,77.4351,osm-ta,Gobichettipalayam,Q25553173
+Erode,Kodumudi,கொடுமுடி,11.0752,77.8859,osm-ta,Kodumudi,Q25553160
+Erode,Modakurichi,மொடக்குறிச்சி,11.2344,77.7784,osm-ta,Modakuruchi,Q25553164
+Erode,Nambiyur,நம்பியூர்,11.3568,77.3189,osm-ta,Nambiyur,Q25553174
+Erode,Perundurai,பெருந்துறை,11.2765,77.5836,osm-ta,Perundurai,Q25553166
+Erode,Satyamangalam,சத்தியமங்கலம்,11.5011,77.2451,osm-ta,Satyamangalam,Q25553176
+Erode,Talavadi,தாளவாடி,11.7771,77.0053,osm-ta,Talavadi,Q25553165
+Erode,Thoockanaickenpalaiyam,தூக்கநாயக்கன்பாளையம்,11.5077,77.3833,nominatim,"Government Hospital, T.N.Palayam",Q25553171
+Kallakurichi,Chinnasalem,சின்னசேலம்,11.6355,78.881,osm-en,Chinnasalem,Q5101182
+Kallakurichi,Kallakurichi,கள்ளக்குறிச்சி,11.7406,78.9637,osm-en,Kallakurichi,Q6353501
+Kallakurichi,Rishivandiyam,,11.8103,79.1024,nominatim,"Government Hospital, Rishivandiyam",Q7336072
+Kallakurichi,Sankarapuram,சங்கராபுரம்,11.8874,78.9166,osm-en,Sankarapuram,Q7418664
+Kallakurichi,Thiagadurgam,தியாகதுர்கம்,11.7418,79.0733,osm-en,Thiyagadurgam,Q7783815
+Kallakurichi,Thirukoyilur,திருக்கோவிலூர்,11.9693,79.2052,osm-en,Tirukkovilur,Q7785303
+Kallakurichi,Ulundurpet,உளுந்தூர்பேட்டை,11.6908,79.2887,osm-en,Ulundurpettai,Q25552814
+Kanchipuram,Kanchipuram,காஞ்சிபுரம்,12.8364,79.7053,osm-ta,Kanchipuram,Q25552707
+Kanchipuram,Kunnattur,,12.9958,80.0973,osm-en,Kundrathur,Q25552719
+Kanchipuram,Sriperumbudur,ஸ்ரீபெரும்புதூர்,12.9666,79.9458,osm-ta,Sriperumbudur,Q25552725
+Kanchipuram,Uttiramerur,உத்திரமேரூர்,12.617,79.7598,osm-ta,Uttiramerur,Q25552710
+Kanchipuram,Walajabad,வாலாஜாபாத்,12.7916,79.818,osm-ta,Wallajahbad,Q25552709
+Madurai,Alanganallur,அலங்காநல்லூர்,10.0464,78.0878,osm-ta,Alanganallur,Q25552318
+Madurai,Chellampatti,செல்லம்பட்டி,9.9441,77.898,osm-ta,Chellampatty,Q25552405
+Madurai,Kallikudi,கள்ளிகுடி,9.696,77.9723,osm-en,Kalligudi,Q25552382
+Madurai,Kottampatti,கொட்டாம்பட்டி,10.2216,78.3739,osm-ta,Kottampatti,Q25552338
+Madurai,Madurai East,மதுரை கிழக்கு,9.9091,78.1345,nominatim,Madurai East,Q12987107
+Madurai,Madurai West,மதுரை மேற்கு,9.9376,78.0753,nominatim,Vattaatchiyar Aluvalagam - Madurai Maerkku Vattam,Q25552316
+Madurai,Melur,மேலூர்,10.0309,78.3376,osm-ta,Melur,Q25552336
+Madurai,T. Kallupatti,தே. கல்லுப்பட்டி,9.7206,77.8517,osm-ta,T.Kallupatti,Q25552373
+Madurai,Thirumangalam,திருமங்கலம்,9.8238,77.9862,osm-ta,Tirumangalam,Q25552380
+Madurai,Thirupparankunram,திருப்பரங்குன்றம்,9.88,78.0639,osm-ta,Thirupparankundram,Q25552322
+Madurai,Usilampatti,உசிலம்பட்டி,9.9649,77.7899,osm-ta,Usilampatti,Q25552360
+Madurai,Vadipatti,வாடிபட்டி,10.0826,77.9683,osm-en,Vadipatti,Q25552354
+Mayiladuthurai,Kollidam,கொள்ளிடம்,11.3306,79.7151,osm-ta,Anikkaranchattram,Q25552997
+Mayiladuthurai,Kuthalam,குத்தாலம்,11.0728,79.5596,osm-ta,Kuthalam,Q25552992
+Mayiladuthurai,Mayiladuthurai,மயிலாடுதுறை,11.1019,79.6503,osm-ta,Mayiladuthurai,Q25552990
+Mayiladuthurai,Sembanar Koil,செம்பனார்கோயில்,11.1043,79.7353,osm-ta,Sembanarkoil,Q25552993
+Mayiladuthurai,Sirkazhi,சீர்காழி,11.2378,79.7396,osm-ta,Sirkazhi,Q25552995
+Nagapattinam,Keelaiyur,கீழையூர்,10.616,79.7688,osm-en,keelaiyur,Q25552977
+Nagapattinam,Kilvelur,கீழ்வேளூர்,10.7667,79.7418,osm-en,Kilvelur,Q25552981
+Nagapattinam,Nagapattinam,நாகப்பட்டினம்,10.7648,79.8431,osm-ta,Nagapattinam,Q25552978
+Nagapattinam,Talanayar,தலைஞாயிறு,10.5633,79.7733,osm-en,Thalainayar,Q25552985
+Nagapattinam,Thirumarugal,திருமருகல்,10.8693,79.7458,osm-en,Thirumarugal,Q25552980
+Nagapattinam,Vedaranyam,வேதாரண்யம்,10.375,79.8489,osm-ta,Vedaranyam,Q25552986
+Pudukkottai,Annavasal,அன்னவாசல்,10.4608,78.6994,osm-ta,Annavasal,Q25553106
+Pudukkottai,Aranthangi,அறந்தாங்கி,10.1686,78.9928,osm-ta,Aranthangi,Q25553114
+Pudukkottai,Arimalam,அரிமளம்,10.255,78.884,osm-ta,Arimalam,Q25553109
+Pudukkottai,Avadaiyarkoil,ஆவுடையார்கோயில்,10.0748,79.0437,osm-en,Avadaiyar Kovil,Q25553116
+Pudukkottai,Gandharvakottai,கந்தர்வகோட்டை,10.5729,79.0149,osm-en,Gandarvakottai,Q25553118
+Pudukkottai,Karambakudi,கறம்பக்குடி,10.4587,79.1377,osm-ta,Karambakudi,Q25553115
+Pudukkottai,Kunandarkoil,குன்னாண்டார்கோயில்,10.5823,78.8966,osm-en,Kunnandarkovil,Q25553120
+Pudukkottai,Manamelkudi,மணமேல்குடி,10.0419,79.23,osm-ta,Manamelkudi,Q25553117
+Pudukkottai,Ponnamaravathi,பொன்னமராவதி,10.2757,78.5403,osm-ta,Ponnamaravati,Q25553110
+Pudukkottai,Pudukkottai,புதுக்கோட்டை,10.3827,78.8191,osm-ta,Pudukkottai,Q25553111
+Pudukkottai,Thirumayam,திருமயம்,10.2449,78.7464,osm-ta,Tirumayam,Q25553112
+Pudukkottai,Thiruvarankulam,திருவரங்குளம்,10.3563,78.8744,osm-ta,Thiruvarangulam,Q25553119
+Pudukkottai,Viralimalai,விராலிமலை,10.6023,78.5471,osm-ta,Viralimalai,Q25553113
+Ramanathapuram,Bogalur,போகலூர்,9.4124,78.7128,osm-en,Bogalur,Q25552962
+Ramanathapuram,Kadaladi,கடலாடி,9.2225,78.4965,osm-ta,Kadaladi,Q25552965
+Ramanathapuram,Kamudi,கமுதி,9.4086,78.3684,osm-ta,Kamuthi,Q25552967
+Ramanathapuram,Mandapam,மண்டபம்,9.2827,79.1527,osm-ta,Mandapam,Q25552951
+Ramanathapuram,Mudukulathur,முதுகுளத்தூர்,9.3444,78.5155,osm-ta,Mudukulattur,Q25552968
+Ramanathapuram,Nainarkoil,நயினார்கோவில்,9.5457,78.6941,osm-en,Nainarkovil,Q25552976
+Ramanathapuram,Paramakudi,பரமக்குடி,9.5411,78.5921,osm-ta,Paramakkudi,Q25552971
+Ramanathapuram,Rajasingamangalam,இராஜசிங்கமங்கலம்,9.637,78.8469,osm-en,R.S. Mangalam,Q25552956
+Ramanathapuram,Ramanathapuram,இராமநாதபுரம்,9.3652,78.8343,osm-ta,Ramanathapuram,Q25552954
+Ramanathapuram,Tiruvadanai,திருவாடானை,9.784,78.9173,osm-ta,Tiruvadanai,Q25552236
+Sivaganga,Devakottai,தேவகோட்டை,9.9457,78.8269,osm-ta,Devakottai,Q25552900
+Sivaganga,Ilaiyankudi,இளையான்குடி,9.6269,78.6223,osm-en,Ilaiyankudi,Q25552886
+Sivaganga,Kallal,கல்லல்,9.9888,78.6632,osm-ta,Kallal,Q25552901
+Sivaganga,Kannankudi,கண்ணங்குடி,9.943,78.9402,nominatim,"PHC, Kannankudi",Q25552902
+Sivaganga,Manamadurai,மானாமதுரை,9.6957,78.4563,osm-ta,Manamadurai,Q25552885
+Sivaganga,S Pudur,எஸ் புதூர்,10.32,78.49,wikidata,S Pudur,Q25552904
+Sivaganga,Singampunari,சிங்கம்புணரி ஒன்றியம்,10.1834,78.4216,osm-en,Singampunari,Q15277866
+Sivaganga,Sivaganga,சிவகங்கை,9.8487,78.487,osm-ta,Sivaganga,Q25552884
+Sivaganga,Tiruppattur,திருப்பத்தூர்,10.1096,78.6014,osm-en,Tiruppattur,Q25552894
+Sivaganga,Tiruppuvanam,திருப்புவனம்,9.8279,78.2555,osm-ta,Tiruppuvanam,Q25552887
+Thanjavur,Ammapettai,அம்மாப்பேட்டை,10.9484,79.3451,osm-en,Ammapettai,Q25553230
+Thanjavur,Budalur,பூதலூர்,10.7886,78.979,osm-ta,Budalur,Q25553142
+Thanjavur,Kumbakonam,கும்பகோணம்,10.9604,79.3821,osm-ta,Kumbakonam,Q25553177
+Thanjavur,Madukur,மதுக்கூர்,10.4805,79.3957,osm-en,Madukkur,Q25553140
+Thanjavur,Orathanadu,ஒரத்தநாடு,10.6297,79.2516,osm-ta,Orathanadu,Q25553191
+Thanjavur,Papanasam,பாபநாசம்,10.927,79.2659,osm-ta,Papanasam,Q25553167
+Thanjavur,Pattukkottai,பட்டுக்கோட்டை,10.4251,79.3131,osm-ta,Pattukkottai,Q25553133
+Thanjavur,Peravurani,பேராவூரணி,10.2872,79.2009,osm-ta,Peravurani,Q25553127
+Thanjavur,Sethubhavachatram,சேதுபாவாசத்திரம்,10.2476,79.2786,osm-en,Sethubhavachatram,Q25553180
+Thanjavur,Thanjavur,தஞ்சாவூர்,10.786,79.1381,osm-ta,Thanjavur,Q25553141
+Thanjavur,Thiruppanandal,திருப்பனந்தாள்,11.0918,79.4535,osm-ta,Thirupanandal,Q25553192
+Thanjavur,Thiruvaiyaru,திருவையாறு,10.8797,79.1039,osm-ta,Thiruvaiyaru,Q25553162
+Thanjavur,Thiruvidaimarudur,திருவிடைமருதூர்,10.996,79.4521,osm-ta,Tiruvidaimarudur,Q25553193
+Tiruchirappalli,Andanallur,அந்தநல்லூர்,10.8728,78.6036,osm-ta,Andanallur,Q25553123
+Tiruchirappalli,Lalgudi,லால்குடி,10.8772,78.8139,osm-en,Lalgudi,Q6480302
+Tiruchirappalli,Manachanallur,மணச்சநல்லூர்,10.9114,78.6998,osm-ta,Manachanallur,Q25553129
+Tiruchirappalli,Manapparai,மணப்பாறை,10.6082,78.4231,osm-ta,Manapparai,Q25553126
+Tiruchirappalli,Manikandam,மணிகண்டம்,10.7377,78.6341,osm-en,Manikandam,Q25553122
+Tiruchirappalli,Marungapuri,மருங்காபுரி,10.4358,78.4107,osm-en,Marungapuri,Q25553131
+Tiruchirappalli,Musiri,முசிறி,10.9516,78.442,osm-ta,Musiri,Q25553134
+Tiruchirappalli,Pullambadi,புள்ளம்பாடி,10.9401,78.9079,osm-ta,Pullambadi,Q25553135
+Tiruchirappalli,Tattayyangarpettai,தாத்தையங்கார்ப்பேட்டை,11.1213,78.4496,osm-en,Thathaiyangarpet,Q25553136
+Tiruchirappalli,Thiruverumbur,திருவெறும்பூர்,10.7913,78.7674,osm-ta,Thiruverumbur,Q25553125
+Tiruchirappalli,Thottiyam,தொட்டியம்,10.9892,78.3354,osm-ta,Thottiyam,Q25553132
+Tiruchirappalli,Thuraiyur,துறையூர்,11.1519,78.5957,osm-ta,Thuraiyur,Q25553137
+Tiruchirappalli,Vaiyampatti,வையம்பட்டி,10.5509,78.3039,osm-ta,Vaiyampatti,Q7908908
+Tirunelveli,Ambasamudram,அம்பாசமுத்திரம்,8.7039,77.4475,osm-ta,Ambasamudram,Q25553073
+Tirunelveli,Cheranmahadevi,சேரன்மாதேவி,8.682,77.5649,osm-en,Cheranmahadevi,Q25553071
+Tirunelveli,Kadayam,கடையம்,8.8228,77.374,osm-ta,Kadayam,Q25553075
+Tirunelveli,Kalakadu,களக்காடு,8.513,77.5576,osm-ta,Kalakkad,Q25553077
+Tirunelveli,Manur,மானூர்,8.8546,77.6526,osm-ta,Manur,Q25553070
+Tirunelveli,Nanguneri,நாங்குநேரி,8.4893,77.6597,osm-ta,Nanguneri,Q25553078
+Tirunelveli,Palayamkottai,பாளையங்கோட்டை,8.7199,77.7371,osm-ta,Palayamkottai,Q25553067
+Tirunelveli,Pappakudi,பாப்பாக்குடி,8.7504,77.5055,nominatim,Mela Pappakudi,Q25553074
+Tirunelveli,Radhapuram,இராதாபுரம்,8.2643,77.685,osm-en,Radhapuram,Q25553079
+Tirunelveli,Valliyoor,வள்ளியூர்,8.3843,77.6089,osm-ta,Valiyoor,Q25553076
+Tiruvallur,Gummidipoondi,கும்மிடிப்பூண்டி,13.4167,80.1271,osm-ta,Gummidipoondi,Q25552758
+Tiruvallur,Kadambathur,கடம்பத்தூர்,13.0983,79.8616,osm-en,Kadambattur,Q25552772
+Tiruvallur,Minjur,மீஞ்சூர்,13.2786,80.2578,osm-ta,Minjur,Q25552753
+Tiruvallur,Pallipattu,பள்ளிப்பட்டு,13.3371,79.4408,osm-en,Pallipattu,Q25552765
+Tiruvallur,Poonamallee,பூந்தமல்லி,13.0417,80.1007,osm-ta,Poonamallee,Q25552774
+Tiruvallur,Poondi,பூண்டி,13.2086,79.8773,osm-en,Poondi,Q25552767
+Tiruvallur,R.K.Pet,ஆர். கே. பேட்டை,13.1656,79.4334,wikidata,R.K.Pet,Q25552764
+Tiruvallur,Sholavaram,சோழவரம்,13.2388,80.1622,osm-ta,Sholavaram,Q25552755
+Tiruvallur,Thiruvalangadu,திருவாலங்காடு,13.1293,79.7768,osm-en,Thiruvalangadu,Q25552756
+Tiruvallur,Tiruttani,திருத்தணி,13.177,79.6128,osm-ta,Tiruttani,Q25552762
+Tiruvallur,Tiruvallur,திருவள்ளூர்,13.1394,79.9071,osm-ta,Tiruvallur,Q25552766
+Tiruvarur,Koradacheri,கொரடாச்சேரி,10.77,79.4912,osm-ta,Koradacheri,Q25553012
+Tiruvarur,Kottur,கோட்டூர்,10.6154,79.5607,osm-en,Kottur,Q25553017
+Tiruvarur,Kudavasal,குடவாசல்,10.8553,79.481,osm-ta,Kodavasal,Q25553003
+Tiruvarur,Mannargudi,மன்னார்குடி,10.6673,79.4444,osm-ta,Mannargudi,Q25553014
+Tiruvarur,Muthupet,முத்துப்பேட்டை,10.3957,79.4945,osm-ta,Muthupet,Q25553024
+Tiruvarur,Nannilam,நன்னிலம்,10.8809,79.6135,osm-ta,Nannilam,Q25553002
+Tiruvarur,Needamangalam,நீடாமங்கலம்,10.7717,79.4145,osm-ta,Needamangalam,Q25553015
+Tiruvarur,Thiruthiraipoondi,திருத்துறைப்பூண்டி,10.5317,79.6401,osm-ta,Thiruthuraipoondi,Q25553020
+Tiruvarur,Tiruvarur,திருவாரூர்,10.7667,79.6352,osm-ta,Thiruvarur,Q25553010
+Tiruvarur,Valangaiman,வலங்கைமான்,10.8898,79.3935,osm-ta,Valangaiman,Q25553001
+Viluppuram,Gingee,செஞ்சி,12.2544,79.4158,osm-ta,Gingee,Q16886582
+Viluppuram,Kanai,காணை,11.9554,79.4177,osm-en,Kanai,Q6360318
+Viluppuram,Kandamangalam,கண்டமங்கலம்,11.916,79.6869,osm-ta,Kandamangalam,Q6361276
+Viluppuram,Koliyanur,கோலியனூர்,11.9267,79.5507,osm-ta,Kolliyanur,Q6427282
+Viluppuram,Mailam,மயிலம்,12.1275,79.6186,osm-en,Mailam,Q6735750
+Viluppuram,Marakkanam,மரக்காணம்,12.1959,79.9442,osm-ta,Marakkanam,Q6754683
+Viluppuram,Melmalayanur,மேல்மலையனூர்,12.341,79.3264,osm-ta,Melmalaiyanur,Q6813223
+Viluppuram,Mugaiyur,முகையூர்,11.976,79.3096,osm-ta,Mugaiyur,Q6932069
+Viluppuram,Olakkur,ஓலக்கூர்,12.3036,79.7209,nominatim,Olakkur PHC,Q7083052
+Viluppuram,Thiruvennainallur,திருவெண்ணைநல்லூர்,11.8652,79.3674,osm-en,Thiruvennainalur,Q7785546
+Viluppuram,Tirunavalur,திருநாவலூர்,11.7597,79.3921,nominatim,Thirunavalur PHC,Q7809359
+Viluppuram,Vallam,வல்லம்,12.2443,79.5066,wikidata,Vallam,Q7911815
+Viluppuram,Vanur,வானூர்,12.0245,79.7264,osm-ta,Vanur,Q7915260
+Viluppuram,Vikravandi,விக்கிரவாண்டி,12.0374,79.5436,osm-ta,Vikravandi,Q7929616

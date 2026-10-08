@@ -1,0 +1,29 @@
+# PRE-REGISTERED pass/fail criteria for `python -m blastwatch evaluate`.
+#
+# Commit this file BEFORE the first run. The command prints its hash; if it is edited after
+# seeing results, the result is void. Every number is a hypothesis chosen up front, not fitted.
+# If the verdict is FAIL or INCONCLUSIVE, do not tune risk_rules.toml on the same observations:
+# collect more, or fall back to the baseline rule plus crop-stage targeting.
+
+[label]
+# Lesions appear days after infection, so an observation on day D is compared with the weather
+# that could have caused it: the highest daily score from D - lead_max_days to D - lead_min_days.
+lead_min_days = 3
+lead_max_days = 14
+
+[baseline]
+# The model must beat a simple rule: inside the main blast season, the mean RH over the same
+# window. The season may wrap the year end (e.g. start "11-01", end "02-28").
+season_start_mmdd = "10-20"     # Samba booting-heading (hypothesis)
+season_end_mmdd = "12-15"
+alert_mean_rh_pct = 85
+
+[pass]
+min_present = 30                # fewer -> INCONCLUSIVE, never PASS
+min_absent = 30                 # without absences false alarms cannot be measured
+min_districts_with_present = 3
+ap_relative_gain_min = 0.25     # model average precision >= baseline x 1.25
+bootstrap_iterations = 1000     # resamples district-months: days in one month are correlated
+require_ci_above_zero = true    # 95 % CI of (model AP - baseline AP) must exclude zero
+min_precision = 0.30            # at the current High threshold
+min_recall = 0.50

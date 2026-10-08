@@ -4,6 +4,7 @@ from sqlalchemy import select
 
 from blastwatch import config
 from blastwatch.models import Alert, District, RiskDaily
+from blastwatch.risk import load_rules
 
 
 def ids(client):
@@ -12,7 +13,7 @@ def ids(client):
 
 def test_health_reports_forecast_freshness(client):
     body = client.get("/api/health").json()
-    assert body["status"] == "ok" and body["districts"] == 17
+    assert body["status"] == "ok" and body["districts"] == 18
     assert body["forecast"]["status"] == "fresh"
     assert "last_ok" in body["sources"]["open-meteo"]
 
@@ -34,8 +35,7 @@ def test_risk_map_ranks_wet_district_first(client):
     assert body["date"] == date.today().isoformat()
     first, last = body["districts"][0], body["districts"][-1]
     assert first["name"] == "Thanjavur" and first["level"] == "High"
-    assert first["production_exposed_t"] == round(100_000 * 4313.2 / 1000)
-    assert last["level"] == "Low" and last["production_exposed_t"] is None
+    assert last["level"] == "Low"
 
 
 def test_district_endpoints(client):
@@ -78,16 +78,16 @@ def test_sensor_readings_override_grid_weather(client, seeded, monkeypatch):
     # Grid weather says Madurai is dry; a canopy sensor reports long leaf wetness overnight.
     start = datetime.combine(date.today() - timedelta(days=1), datetime.min.time()).replace(hour=12)
     readings = [{"ts": (start + timedelta(hours=i)).isoformat(), "temp_c": 25.0,
-                 "leaf_wet_min": 60 if 8 <= i < 21 else 0} for i in range(24)]
+                 "leaf_wet_min": 60 if 4 <= i < 21 else 0} for i in range(24)]
     res = client.post("/api/sensors/readings", headers={"X-API-Key": "secret"},
                       json={"station_id": "MDU-01", "district": "madurai", "readings": readings})
     assert res.status_code == 202 and res.json()["accepted"] == 24
     with seeded() as s:
         d = s.scalar(select(District).where(District.name == "Madurai"))
         today = s.scalar(select(RiskDaily).where(RiskDaily.district_id == d.id, RiskDaily.date == date.today(),
-                                                 RiskDaily.model_version == "rules-v2"))
+                                                 RiskDaily.model_version == load_rules()["model_version"]))
     assert today.wetness_basis == "sensor"
-    assert today.longest_wet_run == 13 and today.level == "High"
+    assert today.longest_wet_run == 17 and today.level == "High"
 
 
 def test_production_and_genes(client):
@@ -101,5 +101,54 @@ def test_production_and_genes(client):
 
 
 def test_pages_are_served(client):
-    assert "officer.js" in client.get("/").text
-    assert "research.js" in client.get("/research.html").text
+    """The built Vue app: every page path returns the app shell, bundles are served, API paths are not."""
+    import re
+
+    if not (config.WEB_DIR / "index.html").exists():
+        import pytest
+        pytest.skip("frontend not built (cd frontend && npm run build)")
+    shell = client.get("/").text
+    assert '<div id="app">' in shell
+    for path in ("/live", "/confidence", "/research", "/research.html"):
+        assert client.get(path).text == shell
+    bundle = re.search(r'src="(/assets/[^"]+\.js)"', shell).group(1)
+    assert client.get(bundle).status_code == 200
+    assert client.get("/api/no-such-endpoint").status_code == 404
+    assert client.get("/../blastwatch/config.py").text == shell  # no path traversal out of the build
+
+
+def test_field_check_becomes_an_observation(client, seeded):
+    from blastwatch import alerts
+    with seeded() as s:
+        alerts.evaluate(s, load_rules())
+    tid, mid = ids(client)["Thanjavur"], ids(client)["Madurai"]
+    [alert] = client.get("/api/alerts").json()
+    body = {"blast_found": True, "fields_checked": 5, "note": "leaf blast in 2 fields", "alert_id": alert["id"]}
+    res = client.post(f"/api/districts/{tid}/field-checks", json=body)
+    assert res.status_code == 201
+    # A routine visit with no alert counts; another district's alert does not.
+    assert client.post(f"/api/districts/{mid}/field-checks", json={"blast_found": False}).status_code == 201
+    bad = {"blast_found": False, "alert_id": alert["id"]}
+    assert client.post(f"/api/districts/{mid}/field-checks", json=bad).status_code == 404
+    assert client.get("/api/alerts").json()[0]["field_checks"][0]["blast_found"] is True
+    with seeded() as s:
+        from blastwatch.models import Observation
+        obs = {o.source: o for o in s.scalars(select(Observation))}
+    assert obs[res.json()["observation"]].blast_present is True
+    assert len(obs) == 2
+    checks = client.get(f"/api/districts/{tid}/field-checks").json()
+    assert checks[0]["blast_found"] is True and checks[0]["fields_checked"] == 5
+    outlook = {d["name"]: d for d in client.get("/api/outlook").json()["districts"]}
+    assert outlook["Thanjavur"]["last_check"]["blast_found"] is True
+
+
+def test_outlook_explains_each_score(client):
+    day = client.get("/api/outlook").json()["districts"][0]["days"][0]
+    assert set(day["points"]) == {"run", "hours", "rain", "cloud"}
+    assert round(sum(day["points"].values()) * day["susceptibility"], 1) == day["score"]
+
+
+def test_advice_offers_no_breeding_lines(client):
+    advice = client.get(f"/api/districts/{ids(client)['Thanjavur']}/advice").json()
+    assert all(v["status"] == "released" for v in advice["varieties"])
+    assert advice["next_season"] is None

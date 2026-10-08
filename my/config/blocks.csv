@@ -1,0 +1,7 @@
+block_id,block,district,lat,lon,coord_source
+TNJ-BUD,Budalur,Thanjavur,10.850,79.050,APPROXIMATE-replace-with-official-block-centroid
+TNJ-ORA,Orathanadu,Thanjavur,10.620,79.020,APPROXIMATE-replace-with-official-block-centroid
+TNJ-KUM,Kumbakonam,Thanjavur,10.960,79.380,APPROXIMATE-replace-with-official-block-centroid
+TVR-TVR,Thiruvarur,Thiruvarur,10.772,79.636,APPROXIMATE-replace-with-official-block-centroid
+NGP-NGP,Nagapattinam,Nagapattinam,10.766,79.842,APPROXIMATE-replace-with-official-block-centroid
+MYT-SIR,Sirkazhi,Mayiladuthurai,11.240,79.740,APPROXIMATE-replace-with-official-block-centroid

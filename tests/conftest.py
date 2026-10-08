@@ -41,7 +41,6 @@ def seeded(Session):
     with Session() as s:
         thanjavur = s.query(District).filter_by(name="Thanjavur").one()
         madurai = s.query(District).filter_by(name="Madurai").one()
-        thanjavur.rice_area_ha = 100_000
         upsert(s, WeatherHourly, synthetic_weather(thanjavur.id, True) + synthetic_weather(madurai.id, False),
                ["district_id", "ts", "source"])
         upsert(s, Production, [

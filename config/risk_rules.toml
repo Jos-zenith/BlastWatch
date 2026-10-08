@@ -1,4 +1,4 @@
-# BlastWatch risk model, rule-based v2.
+# BlastWatch risk model, rule-based v3.
 #
 # Rice blast (Magnaporthe oryzae) infects when leaves stay wet for many hours at moderate
 # temperatures. An hour counts as "conducive" when the leaf is (estimated to be) wet and the
@@ -6,7 +6,17 @@
 # as BLASTAM (Japan); every number below is a starting assumption to be calibrated with
 # `python -m blastwatch backtest` against field observations.
 
-model_version = "rules-v2"
+model_version = "rules-v3"
+
+# rules-v3 is tuned for a BASE RATE, not validated against outbreaks. rules-v2 rated 65 % of
+# October-January district-days High (84 % in October) on archived 1-day-lead Open-Meteo forecasts
+# for 2024-01-22 to 2026-10-06, and met the alert rule about 16 times per district per season:
+# always red, so it carried no information. v3 needs wetter hours (about RH >= 93 %, where blast
+# sporulation is usually reported to start) and a run of more than 8 such hours before any run
+# points. On the same data: High on 18 % of Oct-Jan days (10-30 % by district), Low on 63 %,
+# alert rule met on 16 % of days, median 5 alert episodes per district per season (range 1-11).
+# Re-run the sweep after any change, and replace these numbers with outbreak calibration when
+# observations exist.
 
 # Each daily score covers the "infection night": 12:00 the previous day to 12:00 on the
 # scored date, so an overnight dew period is never split at midnight.
@@ -20,20 +30,26 @@ max_temp_c = 30.0
 # Leaf wetness is not measured by grid weather, so each hour uses the best signal available,
 # in this order. Canopy RH in a flooded paddy usually exceeds screen-level (2 m) RH, which is
 # why a measured sensor value always wins when one exists.
+# lwp, dpd and rh all come from the same model humidity fields, so they act as one RH cutoff
+# (about 90 %) with a rain override, not as independent evidence. Only "sensor" is a measurement.
 [wetness]
 priority = ["sensor", "lwp", "dpd", "rh"]
 sensor_min_wet_minutes = 30     # leaf-wetness sensor: wet if >= 30 min of the hour
-lwp_min_pct = 50.0              # Open-Meteo leaf_wetness_probability
-dpd_max_c = 2.0                 # dew-point depression (T - Td) at or below this = dew likely
+lwp_min_pct = 70.0              # Open-Meteo leaf_wetness_probability (v2: 50)
+dpd_max_c = 1.5                 # dew-point depression (T - Td) at or below this = dew likely (v2: 2.0)
 rain_wets_leaf_mm = 0.2         # any measurable rain in the hour wets the leaf (dpd method)
-rh_min_pct = 90.0               # last resort when no dew point is available
+rh_min_pct = 93.0               # last resort when no dew point is available (v2: 90)
 
 [score]
-# Longest unbroken run of conducive hours (dominant factor).
-full_run_hours = 10
+# Longest unbroken run of conducive hours (dominant factor). Points ramp from 0 at
+# run_start_hours to the full weight at full_run_hours. In season the median night already has a
+# 12-hour run on the v2 wetness rule, so a scale that was full at 10 h could not separate nights.
+run_start_hours = 8
+full_run_hours = 16
 run_weight = 60
-# Total conducive hours in the window.
-full_wet_hours = 16
+# Total conducive hours in the window, ramped the same way.
+wet_start_hours = 8
+full_wet_hours = 18
 hours_weight = 20
 # Light/moderate rain favours spread; heavy rain washes spores off, so no bonus above max.
 rain_min_mm = 0.5
@@ -54,6 +70,38 @@ high = 65
 horizon_days = 3
 min_high_days = 2
 cooldown_days = 5
+# Which risk decides a district's day for the alert rule (both are always reported side by side):
+#   "hq"          Rule A: the district headquarters point (rules-v3 was tuned on this)
+#   "blocks_half" Rule B: High when at least `block_share` of the district's scored blocks are High
+# Falls back to "hq" while block data is stale or a district has no scored blocks.
+district_rule = "hq"
+block_share = 0.5
+
+# Farmer alerts also need the subscriber's crop to be in a susceptible stage. Stage is counted
+# back from maturity (variety duration in seed/crop_calendar.csv): in rice the reproductive phase
+# (~35 days) and ripening (~30 days) are nearly fixed, and only the vegetative phase changes with
+# duration (IRRI Rice Knowledge Bank). Leaf blast matters through booting; neck blast at
+# heading-flowering. Ripening and harvested fields get no alert.
+[crop_stage]
+reproductive_days = 35
+heading_days = 10               # heading-flowering: the last 10 days of the reproductive phase
+ripening_days = 30
+harvested_after_days = 15       # past maturity by more than this = harvested
+default_nursery_age_days = 21   # used only when a transplanted variety has no nursery age (flagged)
+
+[farmers]
+send_hours = [7, 20]            # farmer messages go out only from 07:00 to 19:59 local time
+checkin_days = [7, 14]          # after an alert; lesions take days to show, so 48 h is too early
+checkin_answer_days = 7         # an unanswered question stops blocking the next one after this
+# Non-alerted farmers in susceptible stages are asked too, otherwise missed outbreaks never show up.
+no_alert_checkin_weekly_fraction = 0.15
+
+# Ensemble risk (blastwatch/ensemble.py): every member of three global ensembles is scored with the
+# rules above, giving P(High) per night. Display and comparison only: alerts still follow [alerts].
+[ensemble]
+models = ["ecmwf", "gefs", "icon"]
+refresh_hours = 6               # ensembles update every 6-12 h; ~220 Open-Meteo calls per refresh
+alert_p = 0.5                   # experimental rule: >= min_high_days near days with P(High) >= this
 
 # Data older than this is "stale" (shown with a warning) or "expired" (alerts suppressed).
 [freshness]

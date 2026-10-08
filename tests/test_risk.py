@@ -27,10 +27,26 @@ def test_window_date_runs_noon_to_noon():
 
 
 def test_long_wet_night_is_high():
-    [day] = score_series(wet_night(), RULES, "default")
+    [day] = score_series(wet_night(wet=16), RULES, "default")
     assert day.date == date(2025, 11, 10)
-    assert day.longest_wet_run == 12
+    assert day.longest_wet_run == 16
     assert day.level == "High"
+
+
+def test_typical_monsoon_night_is_not_high():
+    # A 12-hour wet run is the median October-January night, so it must not be High on its own
+    # (rules-v2 made it High and was red on 65 % of season days).
+    [day] = score_series(wet_night(wet=12), RULES, "default")
+    assert day.longest_wet_run == 12 and day.level == "Moderate"
+
+
+def test_score_points_ramp_from_start_to_full():
+    from blastwatch.risk import score_points
+    s = RULES["score"]
+    assert score_points(s["run_start_hours"], 0, 0, None, RULES)["run"] == 0
+    assert score_points(s["full_run_hours"], 0, 0, None, RULES)["run"] == s["run_weight"]
+    assert score_points(0, 0, 5.0, 90, RULES) == {"run": 0, "hours": 0, "rain": s["rain_weight"],
+                                                  "cloud": s["cloud_weight"]}
 
 
 def test_dry_day_is_low():

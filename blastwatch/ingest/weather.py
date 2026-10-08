@@ -4,7 +4,10 @@
   Districts are batched into multi-location requests, paced to stay under the per-minute limit.
 - MET Norway: fallback forecast when Open-Meteo is down (about 2.5 days of hourly steps).
   It has no multi-location API, so requests go one district at a time, throttled.
-- NASA POWER: historical backfill for calibration.
+- Open-Meteo Previous Runs: archived forecasts at a fixed lead time, for backtests that see the
+  same kind of data the live system acts on (default backfill).
+- NASA POWER: reanalysis backfill. Closer to what happened than any forecast, so a backtest on it
+  overstates real-time skill; use it for long histories the forecast archive does not reach.
 
 Every request retries on timeouts, 429 and 5xx with exponential backoff. Every forecast
 attempt is logged in `ingest_run`, which drives the freshness status shown to users.
@@ -24,7 +27,12 @@ log = logging.getLogger("blastwatch.weather")
 
 OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast"
 MET_NO_URL = "https://api.met.no/weatherapi/locationforecast/2.0/complete"
+PREVIOUS_RUNS_URL = "https://previous-runs-api.open-meteo.com/v1/forecast"
 NASA_POWER_URL = "https://power.larc.nasa.gov/api/temporal/hourly/point"
+# Humidity, dew point and leaf wetness in previous runs start on 2024-01-22 for the default
+# (best_match) model at Tamil Nadu points; temperature goes back further. Checked 2026-10-07.
+PREVIOUS_RUNS_HUMIDITY_FROM = date(2024, 1, 22)
+BACKFILL_CHUNK_DAYS = 90
 HOURLY_VARS = ("temperature_2m,relative_humidity_2m,dew_point_2m,precipitation,cloud_cover,"
                "leaf_wetness_probability")
 POWER_FILL = -999.0
@@ -93,7 +101,7 @@ def fetch_open_meteo(
     """Multi-location requests of up to OPEN_METEO_MAX_LOCATIONS districts each.
 
     After each request, wait long enough that the calls it was billed for stay within
-    OPEN_METEO_CALLS_PER_MIN. A single request covers all 17 pilot districts, so there is no wait.
+    OPEN_METEO_CALLS_PER_MIN. A single request covers all 18 pilot districts, so there is no wait.
     """
     if not districts:
         return []
@@ -159,6 +167,71 @@ def fetch_met_no(districts: list[District], client: httpx.Client | None = None) 
     return rows
 
 
+def archive_source(lead_days: int) -> str:
+    return f"archive-forecast:d{lead_days}"
+
+
+def parse_previous_runs(payload: dict, district_id: int, now: datetime, lead_days: int) -> list[dict]:
+    """Hours as forecast by the run `lead_days` earlier. Hours with no temperature or no humidity
+    signal (outside the archive's coverage) are dropped rather than scored as dry."""
+    h = payload["hourly"]
+    suffix = f"_previous_day{lead_days}"
+    n = len(h["time"])
+
+    def col(name):
+        return h.get(name + suffix) or [None] * n
+
+    temp, rh, dew = col("temperature_2m"), col("relative_humidity_2m"), col("dew_point_2m")
+    rain, cloud, lwp = col("precipitation"), col("cloud_cover"), col("leaf_wetness_probability")
+    rows = []
+    for i, ts_text in enumerate(h["time"]):
+        if temp[i] is None or (rh[i] is None and dew[i] is None and lwp[i] is None):
+            continue
+        rows.append(_row(
+            district_id, datetime.fromisoformat(ts_text), now, archive_source(lead_days), True,
+            temp_c=temp[i], rh_pct=rh[i], dew_point_c=dew[i], precip_mm=rain[i],
+            cloud_pct=cloud[i], leaf_wet_prob=lwp[i],
+        ))
+    return rows
+
+
+def fetch_previous_runs(districts: list[District], start: date, end: date, lead_days: int,
+                        client: httpx.Client | None = None) -> list[dict]:
+    """Archived forecasts, all districts per request, BACKFILL_CHUNK_DAYS at a time, paced like the
+    live fetch. Same default model as the live forecast, so a backtest scores what the deployed
+    system would have seen."""
+    if not districts:
+        return []
+    if client is None:
+        with httpx.Client(timeout=config.HTTP_TIMEOUT) as own:
+            return fetch_previous_runs(districts, start, end, lead_days, own)
+    hourly = ",".join(f"{v}_previous_day{lead_days}" for v in HOURLY_VARS.split(","))
+    n_vars = len(HOURLY_VARS.split(","))
+    rows = []
+    chunk_start = start
+    while chunk_start <= end:
+        chunk_end = min(chunk_start + timedelta(days=BACKFILL_CHUNK_DAYS - 1), end)
+        for first in range(0, len(districts), OPEN_METEO_MAX_LOCATIONS):
+            chunk = districts[first:first + OPEN_METEO_MAX_LOCATIONS]
+            params = {
+                "latitude": ",".join(str(d.lat) for d in chunk),
+                "longitude": ",".join(str(d.lon) for d in chunk),
+                "hourly": hourly,
+                "timezone": config.TIMEZONE,
+                "start_date": chunk_start.isoformat(),
+                "end_date": chunk_end.isoformat(),
+            }
+            payload = _get_json(PREVIOUS_RUNS_URL, params, client)
+            payloads = payload if isinstance(payload, list) else [payload]
+            now = datetime.now()
+            for district, item in zip(chunk, payloads, strict=True):
+                rows.extend(parse_previous_runs(item, district.id, now, lead_days))
+            spent = open_meteo_weight(len(chunk), (chunk_end - chunk_start).days + 1, n_vars)
+            time.sleep(60 * spent / OPEN_METEO_CALLS_PER_MIN)
+        chunk_start = chunk_end + timedelta(days=1)
+    return rows
+
+
 def parse_nasa_power(payload: dict, district_id: int, now: datetime) -> list[dict]:
     p = payload["properties"]["parameter"]
 
@@ -205,7 +278,21 @@ def ingest_forecast(session, past_days: int = 3, forecast_days: int = 7, client:
     return run.rows
 
 
-def ingest_backfill(session, start: date, end: date) -> int:
+def ingest_backfill(session, start: date, end: date, source: str = "forecast", lead_days: int = 3) -> int:
+    """source "forecast": archived Open-Meteo runs at `lead_days`; "power": NASA POWER reanalysis."""
+    if source == "forecast":
+        if not 1 <= lead_days <= 7:
+            raise ValueError("lead_days must be 1-7")
+        if start < PREVIOUS_RUNS_HUMIDITY_FROM:
+            log.warning("archived forecasts have no humidity before %s; earlier hours are skipped",
+                        PREVIOUS_RUNS_HUMIDITY_FROM)
+        districts = session.query(District).order_by(District.id).all()
+        with track(session, "open-meteo-archive") as run:
+            run.rows = upsert(session, WeatherHourly, fetch_previous_runs(districts, start, end, lead_days), KEYS)
+        session.commit()
+        return run.rows
+    if source != "power":
+        raise ValueError(f"unknown backfill source {source!r}")
     count = 0
     with httpx.Client(timeout=config.HTTP_TIMEOUT) as client, track(session, "nasa-power") as run:
         for district in session.query(District).order_by(District.id):

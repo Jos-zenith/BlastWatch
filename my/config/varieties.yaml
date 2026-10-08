@@ -1,0 +1,12 @@
+# Seeded from the project's background doc. NOT verified. A variety with
+# blast_rating: unknown gets a generic advisory, never a "resistant" claim.
+# Fill duration_days / nursery_age_days from the TNAU Crop Production Guide
+# and ratings from TNAU / TRRI Aduthurai before the pilot (extension officer task).
+varieties:
+  "CO 51": {duration_days: 107, nursery_age_days: null, blast_rating: unknown, source: "background doc, unverified"}
+  "ADT 43": {duration_days: 110, nursery_age_days: null, blast_rating: unknown, source: "background doc, unverified"}
+  "CO 50": {duration_days: 137, nursery_age_days: null, blast_rating: unknown, source: "background doc, unverified"}
+  "ADT 53": {duration_days: 115, nursery_age_days: null, blast_rating: unknown, source: "background doc, unverified"}
+  "ADT 38": {duration_days: 132, nursery_age_days: null, blast_rating: unknown, source: "background doc, unverified"}
+  "White Ponni": {duration_days: 137, nursery_age_days: null, blast_rating: susceptible, source: "background doc, unverified"}
+  "Other/Unknown": {duration_days: 130, nursery_age_days: null, blast_rating: unknown, source: "default"}
