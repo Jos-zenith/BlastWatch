@@ -46,9 +46,13 @@ Put the answers to question 8 into `blastwatch/seed/crop_calendar.csv`.
    induced hot-spot nurseries, and test with and without the nursery records.
    PDI time series from TNAU or TRRI are unlikely to be public, so this needs a data-sharing request.
 2. `observations import FILE`, then `backfill` the same period (archived forecasts, the default).
-3. Commit `config/eval_criteria.toml`, then run `evaluate --weather archive-forecast:d3` once. Report the verdict exactly as printed,
-   including INCONCLUSIVE or FAIL.
-4. If the verdict is FAIL or INCONCLUSIVE, do not tune `risk_rules.toml` on the same observations. Either
+3. Tune only on records before the holdout (`[split] holdout_start` in `config/eval_criteria.toml`,
+   1 Oct 2026): `backtest --end 2026-09-30 --weather archive-forecast:d3`. The command refuses any later
+   `--end`. Change `risk_rules.toml` from that table only.
+4. Commit `config/eval_criteria.toml` and the rules, then run `evaluate --start 2026-10-15 --weather
+   archive-forecast:d3` once, on held-out records only (the command refuses earlier dates). Report the
+   verdict exactly as printed, including INCONCLUSIVE or FAIL. Never move `holdout_start` after seeing it.
+5. If the verdict is FAIL or INCONCLUSIVE, do not tune `risk_rules.toml` on the same observations. Either
    collect more, or drop the weather model and keep the calendar rule plus crop-stage targeting.
 
 Use archived forecasts (2024-01-22 onward) so the backtest sees forecast errors. Observations before that

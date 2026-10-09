@@ -1,9 +1,12 @@
 from datetime import date, datetime, timedelta
 
+import pytest
 from sqlalchemy import delete, select
 
 from blastwatch import alerts
-from blastwatch.calibration import contingency, import_observations
+from blastwatch.calibration import (SplitError, alerted_nights, backtest, check_range, contingency,
+                                    evaluation_table, import_observations, load_criteria, replay_alerts,
+                                    split_dates)
 from blastwatch.models import Alert, IngestRun, Observation
 from blastwatch.risk import load_rules
 
@@ -40,19 +43,84 @@ def test_single_high_day_does_not_alert(seeded):
         assert alerts.evaluate(s, rules)["created"] == []
 
 
+CRIT = load_criteria()  # label window: 3-14 days before the observation; holdout from 2026-10-01
+HOLDOUT, EVALUATE_FROM = split_dates(CRIT)
+
+
 def test_contingency_counts():
     d = date(2025, 11, 10)
-    scores = {(1, d - timedelta(days=2)): 80.0, (1, d): 20.0, (2, d): 20.0, (3, d): 70.0}
-    obs = [(1, d, True),   # warned 2 days ahead -> TP
+    night = d - timedelta(days=5)
+    scores = {k: {night: 20.0} for k in (1, 2, 3)}
+    alerted = {1: {night}, 3: {night}}
+    obs = [(1, d, True),   # alert named a night 5 days before -> TP
            (2, d, True),   # never warned -> FN
            (3, d, False),  # warned, no blast -> FP
            (2, d, False),  # quiet, no blast -> TN
            (9, d, True)]   # no weather -> skipped
-    scores_65, skipped = contingency(obs, scores, 65, lead_days=3)
-    assert (scores_65.tp, scores_65.fp, scores_65.fn, scores_65.tn, skipped) == (1, 1, 1, 1, 1)
-    assert scores_65.pod == 0.5 and scores_65.far == 0.5 and scores_65.csi == 1 / 3
-    strict, _ = contingency(obs, scores, 90, lead_days=3)
-    assert (strict.tp, strict.fp) == (0, 0) and strict.far is None
+    s, skipped = contingency(obs, scores, alerted, CRIT, 65)
+    assert (s.tp, s.fp, s.fn, s.tn, skipped) == (1, 1, 1, 1, 1)
+    assert s.pod == 0.5 and s.far == 0.5 and s.csi == 1 / 3
+    quiet, _ = contingency(obs, scores, {}, CRIT, 90)
+    assert (quiet.tp, quiet.fp) == (0, 0) and quiet.far is None
+
+
+def test_warning_outside_the_label_window_never_counts():
+    d = date(2025, 11, 20)
+    scores = {1: {d - timedelta(days=k): 50.0 for k in range(30)}}
+
+    def warned(days_before):
+        s, _ = contingency([(1, d, True)], scores, {1: {d - timedelta(days=days_before)}}, CRIT, 65)
+        return s.tp == 1
+
+    # Too late to act on (fewer than 3 days ahead) or too early to be related (more than 14).
+    assert [warned(k) for k in (0, 1, 2, 15, 20)] == [False] * 5
+    assert [warned(k) for k in (3, 8, 14)] == [True] * 3
+
+
+def test_replayed_alerts_follow_the_live_rule():
+    d = date(2025, 11, 1)
+    night = lambda k: d + timedelta(days=k)  # noqa: E731
+    # One High night alone never alerts; two within the 3-night horizon do, once per episode.
+    assert replay_alerts({night(0)}, RULES) == []
+    assert replay_alerts({night(0), night(2)}, RULES) == [(night(0), [night(0), night(2)])]
+    # A week-long wet spell is one alert, not seven.
+    spell = {night(k) for k in range(7)}
+    assert replay_alerts(spell, RULES) == [(night(-1), [night(0), night(1)])]
+    # A new episode needs its first High night more than cooldown_days (5) after the last one began.
+    assert len(replay_alerts({night(0), night(1), night(5), night(6)}, RULES)) == 1
+    assert [a[0] for a in replay_alerts({night(0), night(1), night(6), night(7)}, RULES)] == [night(-1), night(5)]
+    # Only nights the replayed alert actually named count as warned.
+    scores = {night(k): (80.0 if k in (0, 1, 2, 9) else 20.0) for k in range(12)}
+    assert alerted_nights(scores, 65, RULES) == {night(0), night(1)}
+
+
+@pytest.mark.parametrize("start, end, purpose, ok", [
+    (date(2024, 1, 1), HOLDOUT - timedelta(days=1), "tune", True),       # last tuning day
+    (date(2024, 1, 1), HOLDOUT, "tune", False),                          # the boundary itself is held out
+    (date(2024, 1, 1), date(2027, 3, 1), "tune", False),                 # a range spanning the split
+    (HOLDOUT, HOLDOUT + timedelta(days=60), "tune", False),
+    (EVALUATE_FROM, date(2027, 3, 1), "evaluate", True),                 # first held-out day
+    (EVALUATE_FROM - timedelta(days=1), date(2027, 3, 1), "evaluate", False),  # last day of the gap
+    (HOLDOUT, date(2027, 3, 1), "evaluate", False),                      # the gap shares tuning weather
+    (date(2024, 1, 1), date(2027, 3, 1), "evaluate", False),
+    (date(2027, 3, 1), date(2027, 1, 1), "evaluate", False),             # start after end
+])
+def test_split_refuses_ranges_across_the_boundary(start, end, purpose, ok):
+    assert EVALUATE_FROM - HOLDOUT == timedelta(days=CRIT["label"]["lead_max_days"])
+    if ok:
+        check_range(CRIT, start, end, purpose)
+    else:
+        with pytest.raises(SplitError):
+            check_range(CRIT, start, end, purpose)
+
+
+def test_backtest_and_evaluate_fail_loudly_instead_of_trimming(Session):
+    with Session() as s:
+        with pytest.raises(SplitError, match="holdout"):
+            backtest(s, RULES, CRIT, date(2025, 1, 1), date(2026, 12, 31))
+        with pytest.raises(SplitError, match="held-out"):
+            evaluation_table(s, RULES, CRIT, date(2025, 1, 1), date(2026, 12, 31))
+        assert backtest(s, RULES, CRIT, date(2025, 1, 1), HOLDOUT - timedelta(days=1))["observations"] == 0
 
 
 def test_import_observations(Session, tmp_path):

@@ -224,8 +224,42 @@ def test_verdict_is_inconclusive_without_enough_observations():
 def test_verdict_passes_only_when_the_model_beats_the_baseline():
     crit = calibration.load_criteria()
     crit["pass"]["bootstrap_iterations"] = 200
-    assert calibration.verdict(_rows(40, 40), crit)["verdict"].startswith("PASS")
+    good = calibration.verdict(_rows(40, 40), crit)
+    assert good["verdict"].startswith("PASS") and good["model_lift"] == 2.0 and good["prevalence"] == 0.5
     assert calibration.verdict(_rows(40, 40, model_good=False), crit)["verdict"].startswith("FAIL")
+
+
+def test_precision_is_judged_against_prevalence():
+    # Alerting on everything gives precision = prevalence, so lift 1.0: no better than chance,
+    # however high the precision looks when presences dominate the sample.
+    labels = [1] * 70 + [0] * 30
+    assert calibration.lift([1] * 100, labels) == 1.0
+    crit = calibration.load_criteria()
+    crit["pass"]["bootstrap_iterations"] = 200
+    rows = _rows(70, 30)
+    for r in rows:
+        r["model_alert"] = 1
+    v = calibration.verdict(rows, crit)
+    assert v["model_precision"] == 0.7 and v["model_recall"] == 1.0 and v["verdict"].startswith("FAIL")
+
+
+def test_a_small_noisy_pass_is_inconclusive():
+    # Five district-months; the model is right in four and exactly wrong in one. The estimates pass
+    # (precision 0.8 at prevalence 0.5 is lift 1.6), but resampling district-months often draws the
+    # wrong one twice or more, so the interval of the lift reaches 1 and the result is not evidence.
+    rows = []
+    for cluster in range(5):
+        for i in range(16):
+            present = i < 8
+            right = present if cluster < 4 else not present
+            rows.append({"district_id": cluster, "date": date(2025, 11, 1 + i), "label": int(present),
+                         "model": 80.0 if right else 20.0, "baseline": 50.0,
+                         "model_alert": int(right), "baseline_alert": 1})
+    crit = calibration.load_criteria()
+    crit["pass"]["bootstrap_iterations"] = 400
+    v = calibration.verdict(rows, crit)
+    assert v["model_lift"] == pytest.approx(1.6) and v["model_recall"] == 0.8
+    assert v["lift_ci95"][0] <= 1 and v["verdict"].startswith("INCONCLUSIVE: the estimates pass")
 
 
 def test_evaluation_table_matches_observations_to_lagged_weather(seeded):
@@ -236,7 +270,10 @@ def test_evaluation_table_matches_observations_to_lagged_weather(seeded):
             Observation(district_id=thanjavur.id, date=TODAY - timedelta(days=60), blast_present=False, source="t"),
         ])
         s.commit()
-        rows = calibration.evaluation_table(s, RULES, calibration.load_criteria(), TODAY - timedelta(days=90),
-                                            TODAY + timedelta(days=30))
-    assert len(rows) == 1  # the old observation has no weather in its lead window
+        crit = calibration.load_criteria()
+        crit["split"]["holdout_start"] = (TODAY - timedelta(days=120)).isoformat()
+        rows, skipped = calibration.evaluation_table(s, RULES, crit, TODAY - timedelta(days=90),
+                                                     TODAY + timedelta(days=30))
+    assert len(rows) == 1 and skipped == 1  # the old observation has no weather in its label window
+    # Thanjavur's wet nights (today on) meet the alert rule, and the alert names nights 3-14 days before.
     assert rows[0]["label"] == 1 and rows[0]["model_alert"] == 1

@@ -5,15 +5,27 @@
 # If the verdict is FAIL or INCONCLUSIVE, do not tune risk_rules.toml on the same observations:
 # collect more, or fall back to the baseline rule plus crop-stage targeting.
 
+[split]
+# Observations dated before holdout_start may be used to tune the rules (`backtest`). The holdout
+# starts lead_max_days later (here 15 Oct 2026), so no night of weather labels both a tuning and a
+# held-out observation; `evaluate` only uses observations from then on. Both commands refuse a date
+# range that crosses the line instead of trimming it. Historical records (TNAU, TRRI, KVK) tune;
+# the 2026-27 Samba pilot's field checks and verified farmer reports are the prospective test.
+# Never move this date after seeing held-out results.
+holdout_start = "2026-10-01"
+
 [label]
-# Lesions appear days after infection, so an observation on day D is compared with the weather
-# that could have caused it: the highest daily score from D - lead_max_days to D - lead_min_days.
+# Lesions appear days after infection, so an observation on day D is matched with the nights that
+# could have caused it, D - lead_max_days to D - lead_min_days. It counts as warned only if an alert,
+# replayed as the live rule issues it (>= 2 of 3 nights High, 5-day cooldown), named one of those
+# nights. `backtest` uses the same window, so thresholds are tuned on what is evaluated.
 lead_min_days = 3
 lead_max_days = 14
 
 [baseline]
 # The model must beat a simple rule: inside the main blast season, the mean RH over the same
-# window. The season may wrap the year end (e.g. start "11-01", end "02-28").
+# window. The model's score is summarised the same way (mean daily score over the window).
+# The season may wrap the year end (e.g. start "11-01", end "02-28").
 season_start_mmdd = "10-20"     # Samba booting-heading (hypothesis)
 season_end_mmdd = "12-15"
 alert_mean_rh_pct = 85
@@ -24,6 +36,10 @@ min_absent = 30                 # without absences false alarms cannot be measur
 min_districts_with_present = 3
 ap_relative_gain_min = 0.25     # model average precision >= baseline x 1.25
 bootstrap_iterations = 1000     # resamples district-months: days in one month are correlated
-require_ci_above_zero = true    # 95 % CI of (model AP - baseline AP) must exclude zero
-min_precision = 0.30            # at the current High threshold
-min_recall = 0.50
+# Precision depends on how many absences were collected, so it is judged against the share of
+# presences in the sample: lift = precision / prevalence, and alerting at random gives 1.0.
+# At 50 % prevalence, 1.5 means a precision of 0.75; the most lift possible is 1 / prevalence.
+min_precision_lift = 1.5
+min_recall = 0.50               # an alert that misses most outbreaks is not useful however precise
+# Estimates that pass are still INCONCLUSIVE unless the 95 % intervals exclude both "no gain in
+# average precision over the baseline" and "lift of 1 or less".

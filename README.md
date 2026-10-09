@@ -366,11 +366,37 @@ recomputed immediately. One station per district is the intended setup.
 3. The backtest prints, per threshold: hits, false alarms, misses, POD (outbreaks warned),
    FAR (warnings that were wrong), specificity and CSI. Pick a High threshold from that table,
    set it in `risk_rules.toml`, and bump `model_version`.
-4. For a go/no-go decision, run `evaluate` once on observations the thresholds were **not** tuned on.
-   It compares the model with a calendar + humidity baseline, using criteria committed in advance in
+4. For a go/no-go decision, run `evaluate` once on the held-out observations. It compares the model
+   with a calendar + humidity baseline, using criteria committed in advance in
    [config/eval_criteria.toml](config/eval_criteria.toml), and prints PASS, FAIL or INCONCLUSIVE.
    It requires at least 30 presences, 30 absences and 3 districts. It prints the hashes of the criteria
    and rules files, so a result can be tied to the exact settings that produced it.
+
+**What counts as a warning, in both commands.** An observation on day D is matched with the nights
+3–14 days before it (lesions show days after infection). It counts as warned only if the alert rule,
+replayed night by night as the live system runs it (≥ 2 of 3 nights High, 5-day cooldown), named one of
+those nights. A High night that never became an alert does not count, and nor does a warning too late
+to act on or too early to be related. Testing "any High night in the window" instead would call about
+90 % of in-season observations warned by chance. The replay uses the district headquarters (Rule A)
+and one archived forecast per night at a fixed lead.
+
+**Tuning and holdout are split by date** (`[split]` in `eval_criteria.toml`). `backtest` only accepts
+observations before 1 Oct 2026 and `evaluate` only from 15 Oct 2026. The 14-day gap keeps a held-out
+observation's window from sharing weather with a tuning one. Either command **refuses** a range that
+crosses the line instead of trimming it, so a result never silently covers fewer records than asked.
+Historical records tune; this season's pilot field checks and verified farmer reports are the test.
+
+**How `evaluate` decides.**
+- Precision is judged as **lift**, precision over the share of presences in the sample (1.0 = alerting at
+  random), because raw precision depends on how many absences happened to be collected. It needs lift
+  ≥ 1.5 and recall ≥ 0.5 for the alerts as issued.
+- Average precision compares model and baseline on the same summary, the mean over the window (daily
+  score vs RH), and the model must beat the baseline by 25 %.
+- Too few observations → INCONCLUSIVE. Estimates that miss → FAIL. Estimates that pass while the 95 %
+  intervals (resampling district-months) still include no gain over the baseline, or lift ≤ 1 →
+  **INCONCLUSIVE**, not PASS. A PASS means "worth a supervised pilot", never "validated".
+- Lift only means something if presences and absences were found independently of the alerts. Field
+  checks made because of an alert are not; see the validation plan.
 
 See [docs/FIELD_VALIDATION.md](docs/FIELD_VALIDATION.md) for the order of validation steps.
 

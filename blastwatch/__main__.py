@@ -86,10 +86,17 @@ def _pct(v):
     return "   -" if v is None else f"{v * 100:4.0f}%"
 
 
+def _window(crit):
+    lab = crit["label"]
+    return f"{lab['lead_min_days']}-{lab['lead_max_days']} days before the observation"
+
+
 def cmd_backtest(args):
+    crit = calibration.load_criteria()
+    rules = load_rules()
     with SessionLocal() as s:
-        r = calibration.backtest(s, load_rules(), args.start, args.end, args.lead,
-                                 weather_source=args.weather)
+        r = calibration.backtest(s, rules, crit, args.start, args.end, weather_source=args.weather)
+    print(f"tuning period: before {calibration.split_dates(crit)[0]} (the holdout is reserved for `evaluate`)")
     print(f"observations: {r['observations']} ({r['present']} with blast, {r['absent']} without); "
           f"skipped for missing weather: {r['skipped_no_weather']}")
     if not r["observations"]:
@@ -97,7 +104,9 @@ def cmd_backtest(args):
         return
     if not r["absent"]:
         print("WARNING: no absence records, so false alarms cannot be measured.")
-    print(f"warned = any day scored >= threshold within {args.lead} days before the observation\n")
+    a = rules["alerts"]
+    print(f"warned = the alert rule (>= {a['min_high_days']} of {a['horizon_days']} nights High, "
+          f"{a['cooldown_days']}-day cooldown), replayed at each threshold, named a night {_window(crit)}\n")
     print("threshold   TP  FP  FN  TN    POD   FAR  Spec.   CSI")
     for x in r["results"]:
         mark = "  <- current High" if x.threshold == r["current_high"] else ""
@@ -116,20 +125,27 @@ def cmd_evaluate(args):
     print(f"criteria {calibration.file_hash(config.EVAL_CRITERIA_PATH)} | "
           f"rules {calibration.file_hash(config.RULES_PATH)} ({rules['model_version']}) | "
           f"weather {args.weather or 'merged (all sources)'}")
+    print(f"holdout: observations from {calibration.split_dates(crit)[1]} | label window {_window(crit)}")
     with SessionLocal() as s:
-        rows = calibration.evaluation_table(s, rules, crit, args.start, args.end, args.weather)
+        rows, skipped = calibration.evaluation_table(s, rules, crit, args.start, args.end, args.weather)
+    if skipped:
+        print(f"skipped {skipped} observations with no weather in their label window (backfill that period)")
     if not rows:
-        print("No observations with weather in their lead window. Import observations and backfill first.")
+        print("No observations with weather in their label window. Import observations and backfill first.")
         return
     v = calibration.verdict(rows, crit)
-    print(f"observations: {v['present']} with blast, {v['absent']} without, "
-          f"{v['districts_with_present']} districts with blast")
-    print(f"average precision  model {_num(v['model_ap'])}  baseline {_num(v['baseline_ap'])}")
-    print(f"at alert threshold model precision {_num(v['model_precision'])} recall {_num(v['model_recall'])} | "
-          f"baseline precision {_num(v['baseline_precision'])} recall {_num(v['baseline_recall'])}")
-    if v["ap_gain_ci95"]:
-        lo, hi = v["ap_gain_ci95"]
-        print(f"AP gain 95% CI: {lo:+.2f} to {hi:+.2f}")
+    print(f"observations: {v['present']} with blast, {v['absent']} without "
+          f"(prevalence {_num(v['prevalence'])}), {v['districts_with_present']} districts with blast")
+    print(f"average precision (window means)  model {_num(v['model_ap'])}  baseline {_num(v['baseline_ap'])}")
+    print(f"model alerts as issued: on {_num(v['model_alert_rate'])} of observations, precision "
+          f"{_num(v['model_precision'])} (lift {_num(v['model_lift'])}), recall {_num(v['model_recall'])}")
+    print(f"baseline alerts:        precision {_num(v['baseline_precision'])} (lift {_num(v['baseline_lift'])}), "
+          f"recall {_num(v['baseline_recall'])}")
+    for key, label in (("ap_gain_ci95", "AP gain"), ("lift_ci95", "lift")):
+        if v[key]:
+            lo, hi = v[key]
+            print(f"{label} 95% CI: {lo:+.2f} to {hi:+.2f}" if key == "ap_gain_ci95" else
+                  f"{label} 95% CI: {lo:.2f} to {hi:.2f}")
     print("VERDICT:", v["verdict"])
 
 
@@ -266,7 +282,6 @@ def main(argv=None):
     bt = sub.add_parser("backtest", help="score the model against imported observations")
     bt.add_argument("--start", type=date.fromisoformat, required=True, help="YYYY-MM-DD")
     bt.add_argument("--end", type=date.fromisoformat, required=True, help="YYYY-MM-DD")
-    bt.add_argument("--lead", type=int, default=3, help="days of warning that count as a hit")
     bt.add_argument("--weather", help=weather_help)
     bt.set_defaults(func=cmd_backtest)
 
@@ -286,7 +301,10 @@ def main(argv=None):
     sub.add_parser("schedule", help="run the refresh loop on its own").set_defaults(func=cmd_schedule)
 
     args = p.parse_args(argv)
-    args.func(args)
+    try:
+        args.func(args)
+    except calibration.SplitError as e:
+        p.exit(2, f"error: {e}\n")
 
 
 if __name__ == "__main__":

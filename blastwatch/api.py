@@ -687,8 +687,14 @@ def create_app(session_factory: Callable[[], Session] = SessionLocal, scheduler:
         import csv
         import tomllib
 
-        criteria = tomllib.loads(config.EVAL_CRITERIA_PATH.read_text(encoding="utf-8"))["pass"]
+        from .calibration import split_dates
+
+        crit = tomllib.loads(config.EVAL_CRITERIA_PATH.read_text(encoding="utf-8"))
+        criteria = crit["pass"]
         obs = session.scalars(select(Observation)).all()
+        # Only held-out observations count towards the minimums: tuning records judge nothing.
+        holdout_start, evaluate_from = split_dates(crit)
+        held_out = [o for o in obs if o.date >= evaluate_from]
         audit_path = config.ROOT / "docs" / "tnau_surveillance_audit.csv"
         audit = list(csv.DictReader(open(audit_path, encoding="utf-8"))) if audit_path.exists() else []
         kinds = {}
@@ -713,7 +719,15 @@ def create_app(session_factory: Callable[[], Session] = SessionLocal, scheduler:
             },
             "required": {"present": criteria["min_present"], "absent": criteria["min_absent"],
                          "districts_with_present": criteria["min_districts_with_present"],
-                         "min_precision": criteria["min_precision"], "min_recall": criteria["min_recall"]},
+                         "min_precision_lift": criteria["min_precision_lift"], "min_recall": criteria["min_recall"]},
+            "split": {
+                "holdout_start": holdout_start.isoformat(), "evaluate_from": evaluate_from.isoformat(),
+                "tuning": sum(o.date < holdout_start for o in obs),
+                "gap": sum(holdout_start <= o.date < evaluate_from for o in obs),
+                "held_out": {"present": sum(o.blast_present for o in held_out),
+                             "absent": sum(not o.blast_present for o in held_out),
+                             "districts_with_present": len({o.district_id for o in held_out if o.blast_present})},
+            },
             "audit": {
                 "source": "TNAU Centre for Plant Protection Studies, monthly Pest and Disease Surveillance and "
                           "Forecast reports (agritech.tnau.ac.in/crop_protection/surv_fc_reports_en.html)",

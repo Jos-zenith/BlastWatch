@@ -213,5 +213,7 @@ def test_compare_rules_and_validation(client, seeded):
 
     v = client.get("/api/validation").json()
     assert v["observations"]["present"] == 0 and v["required"]["present"] == 30
+    assert v["split"]["holdout_start"] == "2026-10-01" and v["split"]["evaluate_from"] == "2026-10-15"
+    assert v["split"]["held_out"] == {"present": 0, "absent": 0, "districts_with_present": 0}
     assert v["audit"]["reports"] == 33 and v["audit"]["by_kind"]["pilot district"] == 1
     assert all(r["report_url"].startswith("https://agritech.tnau.ac.in/") for r in v["audit"]["records"])
